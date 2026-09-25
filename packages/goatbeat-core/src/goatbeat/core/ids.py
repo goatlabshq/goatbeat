@@ -3,6 +3,7 @@
 import os
 import secrets
 import socket
+import uuid
 from dataclasses import dataclass
 
 
@@ -28,3 +29,7 @@ class IdempotencyKey:
 
 def new_scheduler_id() -> SchedulerId:
     return SchedulerId(f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(4)}")
+
+
+def new_schedule_id() -> ScheduleId:
+    return ScheduleId(uuid.uuid4().hex)
