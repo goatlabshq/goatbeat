@@ -20,6 +20,10 @@ class MisfirePolicy(StrEnum):
 
 DEFAULT_GRACE = timedelta(seconds=60)
 DEFAULT_MAX_CATCH_UP = 100
+# Cron occurrences cannot be counted arithmetically: past this many, the planner jumps to the
+# end of the outage and missed_count becomes a lower bound.
+MAX_CRON_SCAN = 10_000
+CRON_TAIL = timedelta(days=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,9 +71,11 @@ def plan_occurrences(
     late = _Late()
     kept: deque[Instant] = deque()
     on_time: list[Instant] = []
-    occurrence = _skip_ahead(trigger, next_run_at, now - grace, late, policy)
+    late_before = now - grace
+    occurrence = _skip_ahead(trigger, next_run_at, late_before, late, rules)
+    scanned = 0
     while occurrence <= now:
-        if now - occurrence > grace:
+        if occurrence < late_before:
             late.count += 1
             late.last = occurrence
             if policy is MisfirePolicy.CATCH_UP:
@@ -79,20 +85,26 @@ def plan_occurrences(
         else:
             on_time.append(occurrence)
         occurrence = trigger.next_after(occurrence)
+        scanned += 1
+        if scanned == MAX_CRON_SCAN and occurrence < late_before - CRON_TAIL:
+            occurrence = trigger.next_after(late_before - CRON_TAIL)
     claims = [*_late_claims(policy, late, kept), *(_claimed(at) for at in on_time)]
     return OccurrencePlan(tuple(claims), occurrence)
 
 
 def _skip_ahead(
-    trigger: Trigger, occurrence: Instant, late_before: Instant, late: _Late, policy: MisfirePolicy
+    trigger: Trigger, occurrence: Instant, late_before: Instant, late: _Late, rules: MisfireRules
 ) -> Instant:
     """Count long runs of late interval occurrences arithmetically instead of one by one."""
-    if policy is MisfirePolicy.CATCH_UP or not isinstance(trigger, IntervalTrigger):
+    if not isinstance(trigger, IntervalTrigger) or occurrence >= late_before:
         return occurrence
-    skippable = (late_before - occurrence) // trigger.every - 1
+    late_total = -((occurrence - late_before) // trigger.every)
+    keep = rules.max_catch_up if rules.policy is MisfirePolicy.CATCH_UP else 1
+    skippable = late_total - keep
     if skippable <= 0:
         return occurrence
     late.count += skippable
+    late.last_dropped = occurrence + trigger.every * (skippable - 1)
     return occurrence + trigger.every * skippable
 
 
