@@ -26,7 +26,8 @@ class CronTrigger:
 
     def next_after(self, instant: Instant) -> Instant:
         local = instant.datetime.astimezone(self.timezone).replace(tzinfo=None)
-        wall = local - _DST_WINDOW
+        window = _DST_WINDOW if self._near_transition(instant) else timedelta(0)
+        wall = local - window
         best: Instant | None = None
         horizon = datetime.max  # noqa: DTZ901 (naive wall-clock bound)
         while True:
@@ -35,8 +36,13 @@ class CronTrigger:
                 return best
             for candidate in self._instants_at(wall):
                 if candidate > instant and (best is None or candidate < best):
-                    horizon = min(horizon, wall + _DST_WINDOW)
+                    horizon = min(horizon, wall + window)
                     best = candidate
+
+    def _near_transition(self, instant: Instant) -> bool:
+        before = (instant - _DST_WINDOW).datetime.astimezone(self.timezone).utcoffset()
+        after = (instant + _DST_WINDOW).datetime.astimezone(self.timezone).utcoffset()
+        return before != after
 
     def _instants_at(self, wall: datetime) -> list[Instant]:
         first = wall.replace(tzinfo=self.timezone, fold=0).astimezone(UTC)
