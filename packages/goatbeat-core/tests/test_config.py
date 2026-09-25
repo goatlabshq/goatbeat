@@ -82,3 +82,19 @@ def test_mapping_rejects_wrong_types() -> None:
         GoatbeatConfig.from_mapping({"batch_size": 1.5})
     with pytest.raises(ConfigurationError, match="batch_size"):
         GoatbeatConfig.from_mapping({"batch_size": True})
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"batch_size": 0},
+        {"max_submit_retries": -1},
+        {"max_sleep": timedelta(0)},
+        {"lease_ttl": timedelta(seconds=-30)},
+        {"lease_renew_interval": timedelta(seconds=-1)},
+    ],
+    ids=["batch", "retries", "sleep", "ttl", "renew"],
+)
+def test_the_constructor_validates_like_the_parsers(overrides: dict[str, object]) -> None:
+    with pytest.raises(ConfigurationError):
+        GoatbeatConfig(**overrides)  # pyright: ignore[reportArgumentType]

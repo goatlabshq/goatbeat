@@ -26,11 +26,26 @@ class GoatbeatConfig:
     max_submit_retries: int = 5
 
     def __post_init__(self) -> None:
+        errors = [
+            f"{name} must be positive, got {value}"
+            for name, value in (
+                ("lease_ttl", self.lease_ttl),
+                ("lease_renew_interval", self.lease_renew_interval),
+                ("max_sleep", self.max_sleep),
+            )
+            if value <= timedelta(0)
+        ]
+        if self.batch_size < 1:
+            errors.append(f"batch_size must be at least 1, got {self.batch_size}")
+        if self.max_submit_retries < 0:
+            errors.append(f"max_submit_retries must be at least 0, got {self.max_submit_retries}")
         if self.lease_renew_interval * 2 >= self.lease_ttl:
-            raise ConfigurationError(
+            errors.append(
                 "lease_renew_interval must be less than half of lease_ttl "
                 f"({self.lease_renew_interval} >= {self.lease_ttl / 2})"
             )
+        if errors:
+            raise ConfigurationError("invalid Goatbeat configuration: " + "; ".join(errors))
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> Self:
