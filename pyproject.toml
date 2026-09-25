@@ -50,6 +50,8 @@ ignore = ["PLR0913", "PLR2004"]
 "**/tests/**" = ["S101", "PLC0415", "FBT003"]
 "scripts/**" = ["S101", "T201"]
 "**/goatbeat/core/testing/conformance.py" = ["S101"]
+# SQL text only interpolates column lists from module constants; values are always bound.
+"**/goatbeat/core/stores/sqlite.py" = ["S608"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["goatbeat"]
