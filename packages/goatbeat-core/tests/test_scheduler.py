@@ -17,6 +17,7 @@ from goatbeat.core.execution import ExecutionStatus, Lease, SubmissionReceipt
 from goatbeat.core.ids import SchedulerId
 from goatbeat.core.misfire import MisfireRules, OccurrencePlan
 from goatbeat.core.registry import DEFAULT_INTERVAL_ANCHOR, Registry
+from goatbeat.core.schedule import ScheduleDefinition
 from goatbeat.core.scheduler import Scheduler
 from goatbeat.core.stores.memory import MemoryStore
 from goatbeat.core.submission import TaskSubmission
@@ -373,10 +374,48 @@ def test_a_backward_wall_clock_step_does_not_extend_the_sleep() -> None:
     )
     stop = threading.Event()
     wake = clock.now() + timedelta(milliseconds=200)
-    thread = threading.Thread(target=scheduler._sleep_until, args=(wake, stop))
+    thread = threading.Thread(target=scheduler.sleep_until, args=(wake, stop))
     started = time.monotonic()
     thread.start()
     thread.join(timeout=3)
     stop.set()
     thread.join()
     assert time.monotonic() - started < 1
+
+
+class DownAtStartupStore(MemoryStore):
+    def __init__(self, clock: SystemClock) -> None:
+        super().__init__(clock)
+        self.sync_attempts = 0
+
+    def sync_code_schedules(
+        self, definitions: Sequence[ScheduleDefinition], now: Instant, *, prune: bool = False
+    ) -> None:
+        self.sync_attempts += 1
+        if self.sync_attempts == 1:
+            raise StoreUnavailableError("connection refused")
+        super().sync_code_schedules(definitions, now, prune=prune)
+
+
+def test_run_retries_startup_when_the_store_is_down() -> None:
+    clock = SystemClock()
+    store = DownAtStartupStore(clock)
+    submitter = RecordingSubmitter()
+    registry = Registry()
+    registry.schedule(name="fast", task=generate_report, every="1s")
+    scheduler = Scheduler(
+        store=store,
+        leases=store,
+        submitter=submitter,
+        config=GoatbeatConfig(scheduler_id=SchedulerId("alice")),
+        registry=registry,
+        clock=clock,
+    )
+    stop = threading.Event()
+    thread = threading.Thread(target=scheduler.run, args=(stop,))
+    thread.start()
+    time.sleep(3.5)
+    stop.set()
+    thread.join(timeout=2)
+    assert store.sync_attempts == 2
+    assert submitter.submissions

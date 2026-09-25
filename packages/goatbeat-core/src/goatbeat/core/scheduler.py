@@ -22,6 +22,7 @@ from goatbeat.core.time import Clock, Instant, SystemClock
 
 RETRY_BASE: Final = timedelta(seconds=5)
 RETRY_CAP: Final = timedelta(minutes=5)
+ERROR_BACKOFF_BASE: Final = timedelta(seconds=1)
 ERROR_BACKOFF_CAP: Final = timedelta(seconds=30)
 STOP_CHECK: Final = timedelta(seconds=1)
 
@@ -84,10 +85,13 @@ class Scheduler:
             self._logger, Event.SCHEDULER_STARTED, scheduler_id=self._config.scheduler_id.value
         )
         failures = 0
+        started = False
         try:
-            self.start()
             while not stop.is_set():
                 try:
+                    if not started:
+                        self.start()
+                        started = True
                     wake = self.tick()
                     failures = 0
                 except Exception as error:
@@ -100,9 +104,9 @@ class Scheduler:
                         error=str(error),
                     )
                     wake = self._clock.now() + min(
-                        RETRY_BASE * 2 ** (failures - 1), ERROR_BACKOFF_CAP
+                        ERROR_BACKOFF_BASE * 2 ** (failures - 1), ERROR_BACKOFF_CAP
                     )
-                self._sleep_until(wake, stop)
+                self.sleep_until(wake, stop)
         finally:
             self._keeper.release()
             log_event(
@@ -233,7 +237,7 @@ class Scheduler:
                 candidates.append(max(upcoming, now))
         return min(candidates)
 
-    def _sleep_until(self, wake: Instant, stop: threading.Event) -> None:
+    def sleep_until(self, wake: Instant, stop: threading.Event) -> None:
         """Converted to a monotonic deadline once, so wall clock steps cannot stretch the sleep."""
         deadline = self._clock.monotonic() + (wake - self._clock.now()).total_seconds()
         while not stop.is_set():
