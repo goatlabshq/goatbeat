@@ -1,0 +1,10 @@
+{
+  "include": ["fixtures"],
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "strict",
+  "venvPath": "../..",
+  "venv": ".venv",
+  "extraPaths": ["../../.typecheck"],
+  "reportUnusedExpression": "none",
+  "reportUnnecessaryTypeIgnoreComment": "error"
+}
