@@ -6,8 +6,9 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final, Protocol, Self, overload
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from goatbeat.core.errors import NaiveDatetimeError
+from goatbeat.core.errors import ConfigurationError, NaiveDatetimeError
 
 _EPOCH: Final = datetime(1970, 1, 1, tzinfo=UTC)
 _MICROSECOND: Final = timedelta(microseconds=1)
@@ -69,3 +70,12 @@ class SystemClock:
 
     def monotonic(self) -> float:
         return time.monotonic()
+
+
+def resolve_timezone(value: str | ZoneInfo) -> ZoneInfo:
+    if isinstance(value, ZoneInfo):
+        return value
+    try:
+        return ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise ConfigurationError(f"unknown timezone {value!r}") from error
