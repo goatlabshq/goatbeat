@@ -289,6 +289,22 @@ class StoreConformance(ABC):
         assert execution.status is ExecutionStatus.CLAIMED
         assert sut.store.get_schedule("job") == schedule
 
+    def test_manual_run_at_an_occurrence_instant_does_not_hide_it(self) -> None:
+        sut = self._setup()
+        schedule = self._saved(sut)
+        now = sut.clock.set_and_get(schedule.next_run_at)
+        lease = self._leader(sut)
+        sut.store.claim_manual(lease, schedule, IdempotencyKey("manual:1"), now)
+        assert len(sut.store.claim(lease, schedule, one_claim(schedule), now)) == 1
+        later = sut.store.get_schedule("job")
+        assert later is not None
+        next_at = sut.clock.set_and_get(later.next_run_at)
+        lease = self._leader(sut)
+        sut.store.claim(lease, later, one_claim(later), next_at)
+        manual = sut.store.claim_manual(lease, later, IdempotencyKey("manual:2"), later.next_run_at)
+        assert manual.idempotency_key == IdempotencyKey("manual:2")
+        assert len(sut.store.recent_executions(schedule.id, limit=10)) == 4
+
     # Submissions
 
     def test_pending_includes_stale_claims_and_due_retries_only(self) -> None:

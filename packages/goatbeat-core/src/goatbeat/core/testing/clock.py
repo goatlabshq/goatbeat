@@ -26,3 +26,7 @@ class FakeClock:
         if instant < self._now:
             raise ValueError("a FakeClock never goes backwards")
         self._now = instant
+
+    def set_and_get(self, instant: Instant) -> Instant:
+        self.set(instant)
+        return instant

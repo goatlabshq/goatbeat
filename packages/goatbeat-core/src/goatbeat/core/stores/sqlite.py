@@ -82,9 +82,10 @@ CREATE TABLE IF NOT EXISTS goatbeat_execution (
     completed_at_us INTEGER,
     next_retry_at_us INTEGER,
     backend_result_id TEXT,
-    error TEXT,
-    UNIQUE (schedule_id, scheduled_at_us)
+    error TEXT
 );
+CREATE INDEX IF NOT EXISTS goatbeat_execution_history
+    ON goatbeat_execution (schedule_id, scheduled_at_us);
 CREATE INDEX IF NOT EXISTS goatbeat_execution_pending
     ON goatbeat_execution (status, next_retry_at_us, claimed_at_us);
 CREATE TABLE IF NOT EXISTS goatbeat_lease (

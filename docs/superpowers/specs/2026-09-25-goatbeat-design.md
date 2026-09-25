@@ -185,7 +185,9 @@ RETURNING fencing_token;
 
 ### Occurrence claim
 
-Table `goatbeat_execution` with `UNIQUE (schedule_id, scheduled_at)`. In one transaction:
+Table `goatbeat_execution` with `UNIQUE (idempotency_key)`. The key of a scheduled occurrence
+is derived from `(schedule_id, scheduled_at)`; manual runs carry their own `manual:` key, so they
+never hide a scheduled occurrence at the same instant. In one transaction:
 
 1. `INSERT ... SELECT ... WHERE EXISTS (SELECT 1 FROM goatbeat_lease WHERE partition = 0 AND
    holder_id = %(me)s AND fencing_token = %(token)s AND expires_at > now())
