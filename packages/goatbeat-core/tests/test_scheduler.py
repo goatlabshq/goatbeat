@@ -6,19 +6,28 @@ from datetime import timedelta
 import pytest
 from sample_tasks import generate_report
 
+from goatbeat.core import scheduler as scheduler_module
 from goatbeat.core.config import GoatbeatConfig
-from goatbeat.core.errors import StoreUnavailableError, SubmissionError
+from goatbeat.core.errors import (
+    InvalidCronExpressionError,
+    StoreUnavailableError,
+    SubmissionError,
+)
 from goatbeat.core.execution import ExecutionStatus, Lease, SubmissionReceipt
 from goatbeat.core.ids import SchedulerId
-from goatbeat.core.registry import Registry
+from goatbeat.core.misfire import MisfireRules, OccurrencePlan
+from goatbeat.core.registry import DEFAULT_INTERVAL_ANCHOR, Registry
 from goatbeat.core.scheduler import Scheduler
 from goatbeat.core.stores.memory import MemoryStore
 from goatbeat.core.submission import TaskSubmission
 from goatbeat.core.testing import FakeClock
-from goatbeat.core.time import SystemClock
+from goatbeat.core.testing.clock import DEFAULT_START
+from goatbeat.core.time import Instant, SystemClock
+from goatbeat.core.triggers import IntervalTrigger, Trigger
 
 MINUTE = timedelta(minutes=1)
 TTL = timedelta(seconds=30)
+START = DEFAULT_START.datetime
 
 
 class Crash(BaseException):
@@ -308,3 +317,30 @@ def test_a_slow_tick_stops_before_the_local_lease_deadline() -> None:
     scheduler.tick()
     assert len(submitter.submissions) == 1
     assert not scheduler.is_leader
+
+
+def test_a_schedule_that_fails_to_plan_does_not_block_the_others(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    clock = FakeClock()
+    store = MemoryStore(clock)
+    submitter = RecordingSubmitter()
+    registry = Registry()
+    registry.schedule(name="broken", task=generate_report, every="1m")
+    # Same grid, different anchor, so the two triggers compare unequal.
+    registry.schedule(name="healthy", task=generate_report, every="1m", start_at=START)
+    original = scheduler_module.plan_occurrences
+
+    def plan(
+        trigger: Trigger, next_run_at: Instant, now: Instant, rules: MisfireRules
+    ) -> OccurrencePlan:
+        if trigger == IntervalTrigger(MINUTE, DEFAULT_INTERVAL_ANCHOR):
+            raise InvalidCronExpressionError("never matches")
+        return original(trigger, next_run_at, now, rules)
+
+    monkeypatch.setattr(scheduler_module, "plan_occurrences", plan)
+    scheduler = make_scheduler(store, clock, submitter, registry=registry)
+    clock.advance(MINUTE)
+    scheduler.tick()
+    assert [s.schedule_name for s in submitter.submissions] == ["healthy"]
+    assert "schedule.failed" in caplog.text

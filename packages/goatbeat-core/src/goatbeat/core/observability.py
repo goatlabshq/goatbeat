@@ -25,6 +25,9 @@ class Event(StrEnum):
     OCCURRENCE_DISPATCHED = "occurrence.dispatched"
     SUBMISSION_FAILED = "submission.failed"
     STORE_UNAVAILABLE = "store.unavailable"
+    TICK_FAILED = "tick.failed"
+    SCHEDULE_INVALID = "schedule.invalid"
+    SCHEDULE_FAILED = "schedule.failed"
 
 
 def log_event(

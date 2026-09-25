@@ -3,6 +3,7 @@
 Lease expiry uses the injected clock, so SQLite is not a multi-host coordination backend.
 """
 
+import logging
 import sqlite3
 import threading
 from collections.abc import Generator, Sequence
@@ -28,6 +29,7 @@ from goatbeat.core.ids import (
     new_schedule_id,
 )
 from goatbeat.core.misfire import OccurrencePlan
+from goatbeat.core.observability import LOGGER_NAME, Event, log_event
 from goatbeat.core.schedule import Schedule, ScheduleDefinition, ScheduleSource
 from goatbeat.core.serialization import (
     DefinitionColumns,
@@ -112,8 +114,11 @@ type _Row = sqlite3.Row
 class SQLiteStore:
     """Implements ScheduleStore and LeaseManager on one SQLite file."""
 
-    def __init__(self, path: Path | str, clock: Clock) -> None:
+    def __init__(
+        self, path: Path | str, clock: Clock, logger: logging.Logger | None = None
+    ) -> None:
         self._clock = clock
+        self._logger = logger or logging.getLogger(LOGGER_NAME)
         self._lock = threading.Lock()
         self._changed = threading.Condition()
         self._connection = sqlite3.connect(
@@ -225,7 +230,7 @@ class SQLiteStore:
 
     def list_schedules(self) -> Sequence[Schedule]:
         rows = self._read(f"SELECT {_SCHEDULE_COLUMNS} FROM goatbeat_schedule ORDER BY name")
-        return [_schedule(row) for row in rows]
+        return self._decodable(rows)
 
     def set_enabled(self, name: str, *, enabled: bool, now: Instant) -> None:
         with self._write() as cursor:
@@ -248,7 +253,7 @@ class SQLiteStore:
             "WHERE enabled = 1 AND next_run_at_us <= ? ORDER BY next_run_at_us LIMIT ?",
             (now.timestamp_us, limit),
         )
-        return [_schedule(row) for row in rows]
+        return self._decodable(rows)
 
     def claim(
         self, lease: Lease, schedule: Schedule, plan: OccurrencePlan, now: Instant
@@ -378,6 +383,22 @@ class SQLiteStore:
             return self._changed.wait(timeout.total_seconds())
 
     # Internals
+
+    def _decodable(self, rows: Sequence[_Row]) -> list[Schedule]:
+        """Skip rows this version cannot decode, so one bad row never blocks the others."""
+        schedules: list[Schedule] = []
+        for row in rows:
+            try:
+                schedules.append(_schedule(row))
+            except (ConfigurationError, ValueError) as error:
+                log_event(
+                    self._logger,
+                    Event.SCHEDULE_INVALID,
+                    logging.ERROR,
+                    schedule=row[1],
+                    error=str(error),
+                )
+        return schedules
 
     def _ensure_fence(self, cursor: sqlite3.Cursor, lease: Lease) -> None:
         row = cursor.execute(

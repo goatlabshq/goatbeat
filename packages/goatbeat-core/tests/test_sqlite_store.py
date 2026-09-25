@@ -1,6 +1,8 @@
+import sqlite3
 import threading
 from collections.abc import Iterator
 from contextlib import ExitStack
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -78,3 +80,20 @@ def test_a_second_connection_sees_the_takeover(opened: tuple[Path, ExitStack]) -
     assert second.acquire(SchedulerId("bob"), TTL) is not None
     with pytest.raises(LeaseLostError):
         first.claim(stale, schedule, one_claim(schedule), clock.now())
+
+
+def test_an_undecodable_row_is_skipped_instead_of_blocking_the_others(
+    opened: tuple[Path, ExitStack], caplog: pytest.LogCaptureFixture
+) -> None:
+    clock = FakeClock()
+    store = open_store(opened, clock)
+    store.save_schedule(every_minute("broken", clock), clock.now())
+    store.save_schedule(every_minute("healthy", clock), clock.now())
+    path, _ = opened
+    with sqlite3.connect(path) as raw:
+        raw.execute("UPDATE goatbeat_schedule SET trigger_kind = 'solar' WHERE name = 'broken'")
+    raw.close()
+    due = store.due_schedules(clock.advance(timedelta(minutes=1)), limit=10)
+    assert [schedule.name for schedule in due] == ["healthy"]
+    assert [schedule.name for schedule in store.list_schedules()] == ["healthy"]
+    assert "schedule.invalid" in caplog.text

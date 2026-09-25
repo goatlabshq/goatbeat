@@ -94,7 +94,7 @@ class Scheduler:
                     failures += 1
                     log_event(
                         self._logger,
-                        Event.STORE_UNAVAILABLE,
+                        Event.TICK_FAILED,
                         logging.ERROR,
                         exc_info=True,
                         error=str(error),
@@ -144,7 +144,20 @@ class Scheduler:
 
     def _claim_and_submit(self, lease: Lease, schedule: Schedule, now: Instant) -> bool:
         definition = schedule.definition
-        plan = plan_occurrences(definition.trigger, schedule.next_run_at, now, definition.misfire)
+        try:
+            plan = plan_occurrences(
+                definition.trigger, schedule.next_run_at, now, definition.misfire
+            )
+        except Exception as error:
+            log_event(
+                self._logger,
+                Event.SCHEDULE_FAILED,
+                logging.ERROR,
+                exc_info=True,
+                schedule=schedule.name,
+                error=str(error),
+            )
+            return True
         try:
             executions = self._store.claim(lease, schedule, plan, now)
         except LeaseLostError:
