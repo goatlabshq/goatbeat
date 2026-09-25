@@ -1,0 +1,72 @@
+[project]
+name = "goatbeat-workspace"
+version = "0.1.0"
+description = "Development workspace for the Goatbeat packages."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Louis Midson LAJEANTY", email = "midsonlajeanty@proton.me" }]
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "goatbeat",
+    "goatbeat-core",
+    "croniter>=6.0",
+    "hypothesis>=6.140",
+    "lefthook>=1.11",
+    "pyright[nodejs]>=1.1.405",
+    "pytest>=8.4",
+    "ruff>=0.13",
+    "twine>=6.2",
+    "types-croniter>=6.0",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+goatbeat = { workspace = true }
+goatbeat-core = { workspace = true }
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = [".typecheck", "tests/typing/fixtures", "legacy", "docs/superpowers"]
+
+[tool.ruff.lint]
+select = [
+    "A", "ARG", "B", "C4", "DTZ", "E", "F", "FA", "FBT", "I", "ISC", "N", "PGH", "PIE",
+    "PL", "PT", "PTH", "PYI", "RET", "RUF", "S", "SIM", "T20", "TC", "TID", "UP", "W",
+]
+ignore = ["PLR0913", "PLR2004"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "PLC0415", "FBT003"]
+"scripts/**" = ["S101", "T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["goatbeat"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+extraPaths = [".typecheck"]
+include = ["packages", "tests", "scripts"]
+exclude = ["**/__pycache__", "tests/typing/fixtures", "**/.venv", "legacy"]
+reportMissingModuleSource = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib", "-ra", "--strict-markers", "--strict-config"]
+testpaths = ["packages", "tests"]
+filterwarnings = ["error"]

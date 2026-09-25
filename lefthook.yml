@@ -1,0 +1,27 @@
+pre-commit:
+  parallel: true
+  commands:
+    ruff-format:
+      glob: "*.py"
+      run: uv run --no-sync ruff format {staged_files}
+      stage_fixed: true
+    ruff-check:
+      glob: "*.py"
+      run: uv run --no-sync ruff check --fix {staged_files}
+      stage_fixed: true
+    actionlint:
+      glob: ".github/workflows/*.yml"
+      run: uvx --from actionlint-py==1.7.12.25 actionlint {staged_files}
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: uv run --no-sync python scripts/check_commit_message.py {1}
+
+pre-push:
+  parallel: true
+  commands:
+    pyright:
+      run: uv run --no-sync pyright
+    pytest:
+      run: uv run --no-sync pytest -q

@@ -11,3 +11,10 @@ wheels/
 
 # Reference checkout of django-celery-beat
 legacy/
+
+# Tooling caches and build output
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+site/
+.superpowers/
