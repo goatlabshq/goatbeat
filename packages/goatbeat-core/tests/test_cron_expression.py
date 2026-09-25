@@ -142,3 +142,10 @@ def test_matches_croniter_on_wall_clock_time(text: str, start: datetime) -> None
         current = expression.next_wall_time(current)
         assert current == expected
         assert current - start < timedelta(days=366 * 9)
+
+
+def test_rare_but_satisfiable_expressions_are_found() -> None:
+    leap_sunday = CronExpression.parse("0 0 29 2 */7")
+    assert leap_sunday.next_wall_time(datetime(2026, 1, 1)) == datetime(2032, 2, 29)
+    first_monday_of_february = CronExpression.parse("0 0 */31 2 mon")
+    assert first_monday_of_february.next_wall_time(datetime(2027, 2, 2)) == datetime(2038, 2, 1)

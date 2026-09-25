@@ -38,6 +38,8 @@ class CronTrigger:
                 if candidate > instant and (best is None or candidate < best):
                     horizon = min(horizon, wall + window)
                     best = candidate
+            if best is not None and not window:
+                return best
 
     def _near_transition(self, instant: Instant) -> bool:
         before = (instant - _DST_WINDOW).datetime.astimezone(self.timezone).utcoffset()

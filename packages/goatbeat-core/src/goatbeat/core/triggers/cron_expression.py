@@ -10,8 +10,8 @@ from goatbeat.core.errors import InvalidCronExpressionError
 _FIELD_COUNT: Final = 5
 _ALL_HOURS: Final = frozenset(range(24))
 _MAX_DAYS_IN_MONTH: Final = dict(enumerate((31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 1))
-# A satisfiable expression matches within one leap cycle, including the 2096 -> 2104 gap.
-_SEARCH_HORIZON: Final = timedelta(days=366 * 9)
+# The Gregorian calendar repeats weekdays every 400 years; month skipping keeps the search cheap.
+_SEARCH_HORIZON: Final = timedelta(days=146_097)
 _MONTH_NAMES: Final = {
     name.lower(): number for number, name in enumerate(calendar.month_abbr) if name
 }

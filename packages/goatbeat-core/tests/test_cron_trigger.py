@@ -104,3 +104,8 @@ def test_occurrences_strictly_increase(text: str, zone: str, day: int) -> None:
         following = trigger.next_after(current)
         assert following > current
         current = following
+
+
+def test_rare_expression_through_the_trigger() -> None:
+    trigger = CronTrigger.parse("0 0 */31 2 mon", "UTC")
+    assert trigger.next_after(utc(2027, 2, 2)) == utc(2038, 2, 1)
