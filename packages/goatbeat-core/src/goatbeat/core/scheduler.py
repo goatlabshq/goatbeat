@@ -1,0 +1,229 @@
+"""The scheduler loop: hold the lease, claim due occurrences, submit them, sleep until useful."""
+
+import logging
+import threading
+import time
+import uuid
+from datetime import timedelta
+from typing import Final
+
+from goatbeat.core.config import GoatbeatConfig
+from goatbeat.core.errors import ConfigurationError, LeaseLostError
+from goatbeat.core.execution import Execution, ExecutionStatus, Lease
+from goatbeat.core.ids import IdempotencyKey
+from goatbeat.core.lease_keeper import LeaseKeeper
+from goatbeat.core.misfire import plan_occurrences
+from goatbeat.core.observability import LOGGER_NAME, Event, MetricsSink, NoopMetrics, log_event
+from goatbeat.core.protocols import LeaseManager, ScheduleStore, TaskSubmitter
+from goatbeat.core.registry import Registry
+from goatbeat.core.schedule import Schedule
+from goatbeat.core.submission import PendingSubmission
+from goatbeat.core.time import Clock, Instant, SystemClock
+
+RETRY_BASE: Final = timedelta(seconds=5)
+RETRY_CAP: Final = timedelta(minutes=5)
+ERROR_BACKOFF_CAP: Final = timedelta(seconds=30)
+STOP_CHECK: Final = timedelta(seconds=1)
+
+
+def retry_delay(retry_count: int) -> timedelta:
+    return min(RETRY_BASE * 2 ** (retry_count - 1), RETRY_CAP)
+
+
+class Scheduler:
+    def __init__(
+        self,
+        *,
+        store: ScheduleStore,
+        leases: LeaseManager,
+        submitter: TaskSubmitter,
+        config: GoatbeatConfig,
+        registry: Registry | None = None,
+        clock: Clock | None = None,
+        metrics: MetricsSink | None = None,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        self._store = store
+        self._submitter = submitter
+        self._config = config
+        self._registry = registry
+        self._clock = clock or SystemClock()
+        self._metrics = metrics or NoopMetrics()
+        self._logger = logger or logging.getLogger(LOGGER_NAME)
+        self._keeper = LeaseKeeper(
+            leases,
+            config.scheduler_id,
+            ttl=config.lease_ttl,
+            renew_interval=config.lease_renew_interval,
+            clock=self._clock,
+            metrics=self._metrics,
+            logger=self._logger,
+        )
+
+    @property
+    def is_leader(self) -> bool:
+        return self._keeper.valid()
+
+    def start(self) -> None:
+        """Publish code-declared schedules; safe to call from every instance."""
+        if self._registry is not None:
+            self._store.sync_code_schedules(self._registry.definitions(), self._clock.now())
+
+    def tick(self) -> Instant:
+        """Run one iteration and return when the next one is useful."""
+        started = time.perf_counter()
+        lease = self._keeper.ensure()
+        if lease is not None:
+            self._resubmit_pending(lease)
+            self._dispatch_due(lease)
+        self._metrics.tick_duration(time.perf_counter() - started)
+        return self._next_wakeup()
+
+    def run(self, stop: threading.Event) -> None:
+        log_event(
+            self._logger, Event.SCHEDULER_STARTED, scheduler_id=self._config.scheduler_id.value
+        )
+        failures = 0
+        try:
+            self.start()
+            while not stop.is_set():
+                try:
+                    wake = self.tick()
+                    failures = 0
+                except Exception as error:
+                    failures += 1
+                    log_event(
+                        self._logger,
+                        Event.STORE_UNAVAILABLE,
+                        logging.ERROR,
+                        exc_info=True,
+                        error=str(error),
+                    )
+                    wake = self._clock.now() + min(
+                        RETRY_BASE * 2 ** (failures - 1), ERROR_BACKOFF_CAP
+                    )
+                self._sleep_until(wake, stop)
+        finally:
+            self._keeper.release()
+            log_event(
+                self._logger, Event.SCHEDULER_STOPPED, scheduler_id=self._config.scheduler_id.value
+            )
+
+    def run_now(self, name: str) -> Execution:
+        schedule = self._store.get_schedule(name)
+        if schedule is None:
+            raise ConfigurationError(f"unknown schedule {name!r}")
+        lease = self._keeper.ensure()
+        if lease is None:
+            raise LeaseLostError("only the leader can run a schedule now")
+        key = IdempotencyKey(f"manual:{uuid.uuid4().hex}")
+        execution = self._store.claim_manual(lease, schedule, key, self._clock.now())
+        self._submit(PendingSubmission(execution, schedule))
+        return execution
+
+    def _resubmit_pending(self, lease: Lease) -> None:
+        del lease  # submissions are recorded unfenced: the idempotency key protects them
+        now = self._clock.now()
+        pending = self._store.pending_submissions(
+            now, stale_before=now - self._config.lease_ttl, limit=self._config.batch_size
+        )
+        for item in pending:
+            if not self._keeper.valid():
+                return
+            self._submit(item)
+
+    def _dispatch_due(self, lease: Lease) -> None:
+        while self._keeper.valid():
+            now = self._clock.now()
+            due = self._store.due_schedules(now, self._config.batch_size)
+            for schedule in due:
+                if not self._keeper.valid() or not self._claim_and_submit(lease, schedule, now):
+                    return
+            if len(due) < self._config.batch_size:
+                return
+
+    def _claim_and_submit(self, lease: Lease, schedule: Schedule, now: Instant) -> bool:
+        definition = schedule.definition
+        plan = plan_occurrences(definition.trigger, schedule.next_run_at, now, definition.misfire)
+        try:
+            executions = self._store.claim(lease, schedule, plan, now)
+        except LeaseLostError:
+            self._keeper.lost()
+            return False
+        for execution in executions:
+            if execution.status is ExecutionStatus.SKIPPED:
+                self._metrics.occurrences(ExecutionStatus.SKIPPED, execution.missed_count + 1)
+                log_event(
+                    self._logger,
+                    Event.OCCURRENCE_SKIPPED,
+                    schedule=schedule.name,
+                    scheduled_at=execution.scheduled_at.isoformat(),
+                    missed_count=execution.missed_count,
+                )
+                continue
+            self._metrics.occurrences(ExecutionStatus.CLAIMED)
+            if execution.missed_count:
+                self._metrics.occurrences(ExecutionStatus.SKIPPED, execution.missed_count)
+            self._submit(PendingSubmission(execution, schedule))
+        return True
+
+    def _submit(self, pending: PendingSubmission) -> None:
+        if not self._keeper.valid():
+            return  # stays claimed; the next leader resubmits it with the same key
+        execution = pending.execution
+        submission = pending.to_submission()
+        try:
+            receipt = self._submitter.submit(submission)
+        except Exception as error:
+            self._record_failure(execution, error)
+            return
+        now = self._clock.now()
+        self._store.mark_dispatched(execution.idempotency_key, now, receipt)
+        self._metrics.occurrences(ExecutionStatus.DISPATCHED)
+        self._metrics.dispatch_latency((now - execution.scheduled_at).total_seconds())
+        log_event(
+            self._logger,
+            Event.OCCURRENCE_DISPATCHED,
+            schedule=submission.schedule_name,
+            idempotency_key=execution.idempotency_key.value,
+            scheduled_at=execution.scheduled_at.isoformat(),
+            result_id=receipt.result_id,
+        )
+
+    def _record_failure(self, execution: Execution, error: Exception) -> None:
+        retry_count = execution.retry_count + 1
+        final = retry_count > self._config.max_submit_retries
+        retry_at = None if final else self._clock.now() + retry_delay(retry_count)
+        self._store.mark_submit_failed(execution.idempotency_key, str(error), retry_at)
+        self._metrics.occurrences(
+            ExecutionStatus.FAILED if final else ExecutionStatus.SUBMIT_FAILED
+        )
+        log_event(
+            self._logger,
+            Event.SUBMISSION_FAILED,
+            logging.ERROR if final else logging.WARNING,
+            idempotency_key=execution.idempotency_key.value,
+            retry_count=retry_count,
+            final=final,
+            error=str(error),
+        )
+
+    def _next_wakeup(self) -> Instant:
+        now = self._clock.now()
+        candidates = [
+            now + self._config.max_sleep,
+            now + timedelta(seconds=self._keeper.seconds_until_renewal()),
+        ]
+        if self._keeper.valid():
+            upcoming = self._store.next_wakeup()
+            if upcoming is not None:
+                candidates.append(max(upcoming, now))
+        return min(candidates)
+
+    def _sleep_until(self, wake: Instant, stop: threading.Event) -> None:
+        while not stop.is_set():
+            remaining = wake - self._clock.now()
+            if remaining <= timedelta(0):
+                return
+            if self._store.wait_for_change(min(remaining, STOP_CHECK)):
+                return
