@@ -344,3 +344,39 @@ def test_a_schedule_that_fails_to_plan_does_not_block_the_others(
     scheduler.tick()
     assert [s.schedule_name for s in submitter.submissions] == ["healthy"]
     assert "schedule.failed" in caplog.text
+
+
+class SteppingBackClock:
+    """Wall time jumps back one hour once the sleep has started (NTP step, VM restore)."""
+
+    def __init__(self) -> None:
+        self._readings = 0
+
+    def now(self) -> Instant:
+        self._readings += 1
+        offset = timedelta(0) if self._readings <= 2 else -timedelta(hours=1)
+        return DEFAULT_START + offset
+
+    def monotonic(self) -> float:
+        return time.monotonic()
+
+
+def test_a_backward_wall_clock_step_does_not_extend_the_sleep() -> None:
+    clock = SteppingBackClock()
+    store = MemoryStore(clock)
+    scheduler = Scheduler(
+        store=store,
+        leases=store,
+        submitter=RecordingSubmitter(),
+        config=GoatbeatConfig(scheduler_id=SchedulerId("alice")),
+        clock=clock,
+    )
+    stop = threading.Event()
+    wake = clock.now() + timedelta(milliseconds=200)
+    thread = threading.Thread(target=scheduler._sleep_until, args=(wake, stop))
+    started = time.monotonic()
+    thread.start()
+    thread.join(timeout=3)
+    stop.set()
+    thread.join()
+    assert time.monotonic() - started < 1

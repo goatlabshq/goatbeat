@@ -234,9 +234,12 @@ class Scheduler:
         return min(candidates)
 
     def _sleep_until(self, wake: Instant, stop: threading.Event) -> None:
+        """Converted to a monotonic deadline once, so wall clock steps cannot stretch the sleep."""
+        deadline = self._clock.monotonic() + (wake - self._clock.now()).total_seconds()
         while not stop.is_set():
-            remaining = wake - self._clock.now()
-            if remaining <= timedelta(0):
+            remaining = deadline - self._clock.monotonic()
+            if remaining <= 0:
                 return
-            if self._store.wait_for_change(min(remaining, STOP_CHECK)):
+            timeout = min(timedelta(seconds=remaining), STOP_CHECK)
+            if self._store.wait_for_change(timeout):
                 return
