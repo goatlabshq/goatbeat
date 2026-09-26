@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import django
 import pytest
 from django.conf import settings
 from psycopg.conninfo import conninfo_to_dict
@@ -66,3 +67,5 @@ def pytest_configure(config: pytest.Config) -> None:
     del config
     if URL is not None and not settings.configured:
         settings.configure(**django_settings(URL))
+        # Loaded late in a whole-repository run, after pytest-django would have set Django up.
+        django.setup()
