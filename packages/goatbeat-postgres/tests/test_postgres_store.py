@@ -100,3 +100,27 @@ def test_an_undecodable_row_is_skipped(
     due = store.due_schedules(clock.advance(timedelta(minutes=1)), limit=10)
     assert [schedule.name for schedule in due] == ["healthy"]
     assert "schedule.invalid" in caplog.text
+
+
+def test_ten_connections_claiming_one_occurrence_create_one_execution(conninfo: str) -> None:
+    clock = FakeClock()
+    with PsycopgProvider.connect(conninfo, min_size=10, max_size=10) as provider:
+        migrate(provider)
+        store = PostgresStore(provider, lease_clock=clock)
+        schedule = store.save_schedule(every_minute("job", clock), clock.now())
+        lease = store.acquire(ALICE, TTL)
+        assert lease is not None
+        barrier = threading.Barrier(10)
+        created: list[int] = []
+
+        def claim() -> None:
+            barrier.wait()
+            created.append(len(store.claim(lease, schedule, one_claim(schedule), clock.now())))
+
+        threads = [threading.Thread(target=claim) for _ in range(10)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert sorted(created) == [0] * 9 + [1]
+        assert len(store.recent_executions(schedule.id, limit=20)) == 1
