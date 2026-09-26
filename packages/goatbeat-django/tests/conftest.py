@@ -58,7 +58,12 @@ def django_settings(url: str) -> dict[str, object]:
             }
         ],
         "ROOT_URLCONF": "sampleapp.urls",
-        "TASKS": {"default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"}},
+        "TASKS": {
+            "default": {
+                "BACKEND": "django.tasks.backends.immediate.ImmediateBackend",
+                "QUEUES": ["default", "emails", "low"],
+            }
+        },
         "GOATBEAT": {"lease_ttl": "5s", "lease_renew_interval": "1s", "scheduler_id": "tests"},
     }
 

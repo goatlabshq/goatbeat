@@ -14,6 +14,7 @@ from goatbeat.core.errors import ConfigurationError
 SETTING: Final = "GOATBEAT"
 DATABASE_KEY: Final = "database"
 DEFAULT_DATABASE: Final = "default"
+TIMEZONE_KEY: Final = "timezone"
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,7 @@ class DjangoSettings:
             raise ImproperlyConfigured(f"{SETTING} must be a dict, got {type(raw).__name__}")
         values = dict(cast("Mapping[str, object]", raw))
         database = values.pop(DATABASE_KEY, DEFAULT_DATABASE)
+        values.setdefault(TIMEZONE_KEY, settings.TIME_ZONE)
         errors: list[str] = []
         if not isinstance(database, str) or database not in connections.settings:
             errors.append(f"{DATABASE_KEY}: {database!r} is not a configured database alias")
