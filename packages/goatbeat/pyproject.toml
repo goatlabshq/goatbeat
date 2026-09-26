@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["goatbeat-postgres==0.1.0"] # x-release-please-version
+django = ["goatbeat-django==0.1.0"] # x-release-please-version
 
 [project.urls]
 Homepage = "https://github.com/midsonlajeanty/goatbeat"
@@ -38,3 +39,4 @@ module-name = "goatbeat"
 [tool.uv.sources]
 goatbeat-core = { workspace = true }
 goatbeat-postgres = { workspace = true }
+goatbeat-django = { workspace = true }

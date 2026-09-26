@@ -301,6 +301,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+django = [
+    { name = "goatbeat-django" },
+]
 postgres = [
     { name = "goatbeat-postgres" },
 ]
@@ -308,9 +311,10 @@ postgres = [
 [package.metadata]
 requires-dist = [
     { name = "goatbeat-core", editable = "packages/goatbeat-core" },
+    { name = "goatbeat-django", marker = "extra == 'django'", editable = "packages/goatbeat-django" },
     { name = "goatbeat-postgres", marker = "extra == 'postgres'", editable = "packages/goatbeat-postgres" },
 ]
-provides-extras = ["postgres"]
+provides-extras = ["postgres", "django"]
 
 [[package]]
 name = "goatbeat-core"

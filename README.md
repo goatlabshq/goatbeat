@@ -69,6 +69,41 @@ expiry is decided by PostgreSQL's clock, and each occurrence can only be claimed
 1,000,000 schedules the due query takes about 5 ms and a tick claims and submits 500
 occurrences in under a second (`tests/performance`).
 
+## Django 6.1
+
+```bash
+pip install "goatbeat[django]"
+```
+
+```python
+# settings.py
+INSTALLED_APPS = [..., "goatbeat.django"]
+GOATBEAT = {"lease_ttl": "30s"}  # optional; timezone defaults to TIME_ZONE
+```
+
+```python
+# myapp/schedules.py
+from goatbeat.django import DjangoRegistry, call
+from myapp.tasks import generate_report, send_email  # django.tasks.Task objects
+
+
+def register(beat: DjangoRegistry) -> None:
+    beat.schedule(name="daily-report", task=generate_report, cron="0 9 * * *")
+    beat.schedule(name="ping", task=call(send_email, 42), every="5m", queue="emails")
+```
+
+```bash
+python manage.py migrate
+python manage.py goatbeat scheduler          # run on as many hosts as you like
+python manage.py goatbeat schedule list --json
+python manage.py goatbeat schedule run daily-report
+```
+
+Occurrences are enqueued with Django Tasks; `task_finished` marks them `completed` or
+`task_failed`. A task that declares a `goatbeat_key: str` parameter receives the idempotency key.
+The admin lists schedules, their executions and offers enable, disable and run-now actions.
+Give the scheduler process persistent connections (`CONN_MAX_AGE`, `CONN_HEALTH_CHECKS`).
+
 ## Guarantees
 
 - Scheduling: each occurrence is claimed at most once (unique constraint plus fenced lease).

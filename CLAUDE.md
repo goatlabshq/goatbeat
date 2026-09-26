@@ -10,6 +10,9 @@ The design lives in `docs/superpowers/specs/2026-09-25-goatbeat-design.md`.
   `opentelemetry` (`tests/test_boundaries.py` enforces it).
 - `packages/goatbeat-postgres`: production store. All coordination SQL lives in
   `goatbeat/postgres/store.py`, typed `LiteralString`, behind the `ConnectionProvider` protocol.
+- `packages/goatbeat-django`: Django app `goatbeat.django` (label `goatbeat`). It reuses
+  `PostgresStore` through `DjangoProvider`; its migrations must keep matching
+  `goatbeat.postgres.schema` (`tests/test_schema_equivalence.py`). Admin writes go through the store.
 - `packages/goatbeat`: facade distribution. It alone owns `goatbeat/__init__.py`; every other
   package is a namespace portion (`goatbeat/core/`, ...). `pkgutil.extend_path` in that file makes
   editable installs work at runtime.
@@ -24,6 +27,8 @@ The design lives in `docs/superpowers/specs/2026-09-25-goatbeat-design.md`.
 - Every datetime inside core is an `Instant` (aware, UTC). Naive datetimes are rejected, never
   converted.
 - Coordination correctness never depends on scheduler clocks: lease expiry uses the store clock.
+- django-stubs generics are not subscriptable at runtime: parameterize Django base classes through
+  `goatbeat/django/generics.py` and use `from __future__ import annotations` where `Task[...]` appears.
 - Internal dependency pins and versions carry `# x-release-please-version`; release-please
   (`release/`) bumps them all together. Add new packages to `release/config.json`.
 
