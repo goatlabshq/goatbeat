@@ -15,6 +15,7 @@ SETTING: Final = "GOATBEAT"
 DATABASE_KEY: Final = "database"
 DEFAULT_DATABASE: Final = "default"
 TIMEZONE_KEY: Final = "timezone"
+POSTGRESQL: Final = "postgresql"
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +34,8 @@ class DjangoSettings:
         errors: list[str] = []
         if not isinstance(database, str) or database not in connections.settings:
             errors.append(f"{DATABASE_KEY}: {database!r} is not a configured database alias")
+        elif connections[database].vendor != POSTGRESQL:
+            errors.append(f"{DATABASE_KEY}: {database!r} must be a PostgreSQL database")
         try:
             config = GoatbeatConfig.from_mapping(values)
         except ConfigurationError as error:

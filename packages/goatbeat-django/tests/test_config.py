@@ -1,5 +1,8 @@
+from collections.abc import Iterator
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.db import connections
 from django.test import override_settings
 
 from goatbeat.django.conf import DjangoSettings
@@ -32,3 +35,22 @@ def test_the_setting_must_be_a_mapping() -> None:
 def test_the_database_alias_must_exist() -> None:
     with pytest.raises(ImproperlyConfigured, match="missing"):
         DjangoSettings.from_django()
+
+
+@pytest.fixture
+def sqlite_alias() -> Iterator[str]:
+    alias = "lite"
+    sqlite = {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
+    configured = connections.configure_settings(
+        {"default": dict(connections.settings["default"]), alias: sqlite}
+    )
+    connections.settings[alias] = configured[alias]
+    yield alias
+    del connections.settings[alias]
+
+
+@override_settings(GOATBEAT={"database": "lite"})
+def test_the_database_must_be_postgresql(sqlite_alias: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match="PostgreSQL"):
+        DjangoSettings.from_django()
+    assert sqlite_alias in connections.settings
