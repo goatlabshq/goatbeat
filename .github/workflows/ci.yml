@@ -38,6 +38,7 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python }}, PostgreSQL ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -86,6 +87,7 @@ jobs:
   distributed:
     name: Distributed, failure and performance tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       GOATBEAT_TEST_DATABASE_URL: postgresql://goatbeat:goatbeat@localhost:55432/goatbeat
       GOATBEAT_TEST_CAN_RESTART_DATABASE: "1"
