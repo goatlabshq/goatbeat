@@ -63,7 +63,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, terminate)
     config = GoatbeatConfig(
         scheduler_id=SchedulerId(scheduler_id),
-        lease_ttl=timedelta(seconds=3),
+        lease_ttl=timedelta(seconds=5),
         lease_renew_interval=timedelta(seconds=1),
         max_sleep=timedelta(seconds=1),
     )

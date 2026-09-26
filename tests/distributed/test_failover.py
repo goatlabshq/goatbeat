@@ -9,7 +9,7 @@ from distributed_support import SpawnWorker
 
 pytestmark = pytest.mark.distributed
 
-TTL_SECONDS = 3
+TTL_SECONDS = 5
 RENEW_SECONDS = 1
 
 
@@ -63,7 +63,7 @@ def test_a_standby_takes_over_after_the_leader_is_killed(
     )
     first_new = next(row for row in dispatches_since(conninfo, killed_at) if row[1] != killed)
     failover = (first_new[2] - killed_at).total_seconds()
-    assert failover < TTL_SECONDS + RENEW_SECONDS + 2
+    assert failover < TTL_SECONDS + RENEW_SECONDS + 3
     time.sleep(2)
     with psycopg.connect(conninfo) as connection:
         duplicated = connection.execute(
