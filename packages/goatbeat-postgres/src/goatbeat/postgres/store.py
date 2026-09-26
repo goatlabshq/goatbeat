@@ -53,6 +53,9 @@ _EXECUTION_COLUMNS: Final = (
     "backend_result_id, error"
 )
 _SELECT_SCHEDULE: Final = "SELECT " + _SCHEDULE_COLUMNS + " FROM goatbeat_schedule "
+DUE_SCHEDULES_QUERY: Final = (
+    _SELECT_SCHEDULE + "WHERE enabled AND next_run_at <= %s ORDER BY next_run_at LIMIT %s"
+)
 _SELECT_EXECUTION: Final = "SELECT " + _EXECUTION_COLUMNS + " FROM goatbeat_execution "
 _INSERT_SCHEDULE: Final = (
     "INSERT INTO goatbeat_schedule (id, name, source, task_path, task_args, task_kwargs, "
@@ -179,11 +182,7 @@ class PostgresStore:
 
     def due_schedules(self, now: Instant, limit: int) -> Sequence[Schedule]:
         with self._provider.transaction() as cursor:
-            cursor.execute(
-                _SELECT_SCHEDULE + "WHERE enabled AND next_run_at <= %s "
-                "ORDER BY next_run_at LIMIT %s",
-                [now.datetime, limit],
-            )
+            cursor.execute(DUE_SCHEDULES_QUERY, [now.datetime, limit])
             return self._decodable(cursor.fetchall())
 
     def claim(
