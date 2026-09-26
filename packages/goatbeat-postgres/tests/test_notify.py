@@ -38,3 +38,11 @@ def test_an_unreachable_database_degrades_to_a_plain_timeout() -> None:
     unreachable = "postgresql://nobody@127.0.0.1:1/none?connect_timeout=1"
     with PsycopgNotifier(unreachable) as notifier:
         assert not notifier.wait(timedelta(milliseconds=100))
+
+
+def test_an_unroutable_host_does_not_stall_the_wait() -> None:
+    blackhole = "postgresql://nobody@10.255.255.1:5432/none"
+    with PsycopgNotifier(blackhole) as notifier:
+        started = time.monotonic()
+        assert not notifier.wait(timedelta(seconds=1))
+        assert time.monotonic() - started < 4
