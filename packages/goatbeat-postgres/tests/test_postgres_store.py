@@ -7,8 +7,10 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 
-from goatbeat.core.errors import LeaseLostError
+from goatbeat.core.errors import LeaseLostError, StoreUnavailableError
+from goatbeat.core.execution import Lease
 from goatbeat.core.ids import SchedulerId
+from goatbeat.core.schedule import Schedule
 from goatbeat.core.testing import FakeClock, StoreConformance, StoreUnderTest
 from goatbeat.core.testing.conformance import ALICE, TTL, every_minute, one_claim
 from goatbeat.core.time import Instant
@@ -124,3 +126,53 @@ def test_ten_connections_claiming_one_occurrence_create_one_execution(conninfo: 
             thread.join()
         assert sorted(created) == [0] * 9 + [1]
         assert len(store.recent_executions(schedule.id, limit=20)) == 1
+
+
+def test_a_frozen_fence_holder_cannot_block_lease_acquisition(conninfo: str) -> None:
+    with ExitStack() as stack:
+        frozen = stack.enter_context(PsycopgProvider.connect(conninfo))
+        other = stack.enter_context(PsycopgProvider.connect(conninfo))
+        migrate(frozen)
+        clock = FakeClock()
+        store = PostgresStore(frozen, lease_clock=clock)
+        schedule = store.save_schedule(every_minute("job", clock), clock.now())
+        lease = store.acquire(ALICE, TTL)
+        assert lease is not None
+        standby = PostgresStore(other, lease_clock=clock, lock_timeout=timedelta(milliseconds=500))
+        with frozen.transaction() as cursor:
+            store.claim_in(cursor, lease, schedule, one_claim(schedule), clock.now())
+            clock.advance(TTL * 2)
+            started = time.monotonic()
+            with pytest.raises(StoreUnavailableError):
+                standby.acquire(SchedulerId("bob"), TTL)
+            assert time.monotonic() - started < 3
+
+
+def claim_then_freeze(
+    provider: PsycopgProvider,
+    store: PostgresStore,
+    lease: Lease,
+    schedule: Schedule,
+    clock: FakeClock,
+) -> None:
+    with provider.transaction() as cursor:
+        store.claim_in(cursor, lease, schedule, one_claim(schedule), clock.now())
+        time.sleep(1.5)
+
+
+def test_the_database_ends_a_fence_holder_that_stays_idle(conninfo: str) -> None:
+    clock = FakeClock()
+    with ExitStack() as stack:
+        frozen = stack.enter_context(PsycopgProvider.connect(conninfo))
+        other = stack.enter_context(PsycopgProvider.connect(conninfo))
+        migrate(frozen)
+        store = PostgresStore(
+            frozen, lease_clock=clock, fence_idle_timeout=timedelta(milliseconds=500)
+        )
+        schedule = store.save_schedule(every_minute("job", clock), clock.now())
+        lease = store.acquire(ALICE, TTL)
+        assert lease is not None
+        with pytest.raises(StoreUnavailableError):
+            claim_then_freeze(frozen, store, lease, schedule, clock)
+        clock.advance(TTL * 2)
+        assert PostgresStore(other, lease_clock=clock).acquire(SchedulerId("bob"), TTL)

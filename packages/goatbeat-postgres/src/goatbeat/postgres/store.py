@@ -75,6 +75,11 @@ _INSERT_EXECUTION: Final = (
     "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
     "ON CONFLICT (idempotency_key) DO NOTHING"
 )
+DEFAULT_LOCK_TIMEOUT: Final = timedelta(seconds=1)
+DEFAULT_FENCE_IDLE_TIMEOUT: Final = timedelta(seconds=10)
+# set_config(..., true) is SET LOCAL with bindable values: it ends with the transaction.
+_SET_LOCK_TIMEOUT: Final = "SELECT set_config('lock_timeout', %s, true)"
+_SET_IDLE_TIMEOUT: Final = "SELECT set_config('idle_in_transaction_session_timeout', %s, true)"
 _NOTIFY: Final = "SELECT pg_notify('" + CHANNEL + "', '')"
 
 
@@ -87,9 +92,15 @@ class PostgresStore:
         *,
         notifier: Notifier | None = None,
         lease_clock: Clock | None = None,
+        lock_timeout: timedelta = DEFAULT_LOCK_TIMEOUT,
+        fence_idle_timeout: timedelta = DEFAULT_FENCE_IDLE_TIMEOUT,
         logger: logging.Logger | None = None,
     ) -> None:
+        if lock_timeout <= timedelta(0) or fence_idle_timeout <= timedelta(0):
+            raise ConfigurationError("lock_timeout and fence_idle_timeout must be positive")
         self._provider = provider
+        self._lock_timeout = _milliseconds(lock_timeout)
+        self._fence_idle_timeout = _milliseconds(fence_idle_timeout)
         self._notifier = notifier
         self._lease_clock = lease_clock
         self._logger = logger or logging.getLogger(LOGGER_NAME)
@@ -102,6 +113,8 @@ class PostgresStore:
     def acquire(self, holder: SchedulerId, ttl: timedelta) -> Lease | None:
         now = self._now()
         with self._provider.transaction() as cursor:
+            # A frozen leader holding the fence must not stall every standby indefinitely.
+            cursor.execute(_SET_LOCK_TIMEOUT, [self._lock_timeout])
             cursor.execute(
                 "UPDATE goatbeat_lease SET "
                 "fencing_token = fencing_token + (holder_id IS DISTINCT FROM %s)::int, "
@@ -115,6 +128,7 @@ class PostgresStore:
 
     def release(self, lease: Lease) -> None:
         with self._provider.transaction() as cursor:
+            cursor.execute(_SET_LOCK_TIMEOUT, [self._lock_timeout])
             cursor.execute(
                 "UPDATE goatbeat_lease SET expires_at = " + _NOW + " "
                 "WHERE partition = %s AND holder_id = %s AND fencing_token = %s",
@@ -321,7 +335,11 @@ class PostgresStore:
     # Internals
 
     def _ensure_fence(self, cursor: Cursor, lease: Lease) -> None:
-        """FOR SHARE makes a concurrent takeover wait until this claim transaction ends."""
+        """FOR SHARE makes a concurrent takeover wait until this claim transaction ends.
+
+        The idle timeout lets PostgreSQL end that transaction if the leader freezes.
+        """
+        cursor.execute(_SET_IDLE_TIMEOUT, [self._fence_idle_timeout])
         cursor.execute(
             "SELECT 1 FROM goatbeat_lease WHERE partition = %s AND holder_id = %s "
             "AND fencing_token = %s AND expires_at > " + _NOW + " FOR SHARE",
@@ -508,3 +526,7 @@ def _optional_instant(value: object) -> Instant | None:
 
 def _optional_datetime(value: Instant | None) -> datetime | None:
     return None if value is None else value.datetime
+
+
+def _milliseconds(value: timedelta) -> str:
+    return f"{max(1, round(value.total_seconds() * 1000))}ms"
