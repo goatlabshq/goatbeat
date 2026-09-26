@@ -46,6 +46,29 @@ scheduler.run(threading.Event())
 signature. SQLite and `CallableSubmitter` are for development; production uses PostgreSQL and
 a real task backend such as Django Tasks.
 
+## Production: PostgreSQL
+
+```bash
+pip install "goatbeat[postgres]" "psycopg[binary]"
+```
+
+```python
+from goatbeat.postgres.notify import PsycopgNotifier
+from goatbeat.postgres.provider import PsycopgProvider
+from goatbeat.postgres.schema import migrate
+from goatbeat.postgres.store import PostgresStore
+
+provider = PsycopgProvider.connect("postgresql://goatbeat@db/goatbeat")
+migrate(provider)
+store = PostgresStore(provider, notifier=PsycopgNotifier("postgresql://goatbeat@db/goatbeat"))
+scheduler = Scheduler(store=store, leases=store, submitter=..., config=config, registry=beat)
+```
+
+Run as many scheduler processes as you like: they elect a leader through a fenced lease whose
+expiry is decided by PostgreSQL's clock, and each occurrence can only be claimed once. With
+1,000,000 schedules the due query takes about 5 ms and a tick claims and submits 500
+occurrences in under a second (`tests/performance`).
+
 ## Guarantees
 
 - Scheduling: each occurrence is claimed at most once (unique constraint plus fenced lease).
@@ -56,8 +79,11 @@ a real task backend such as Django Tasks.
 ## Development
 
 ```bash
+docker compose up -d --wait postgres
+export GOATBEAT_TEST_DATABASE_URL=postgresql://goatbeat:goatbeat@localhost:55432/goatbeat
 uv sync
 uv run pytest
 uv run pyright
 uv run ruff check . && uv run ruff format --check .
+uv run pytest -m "distributed or performance" tests/distributed tests/performance
 ```

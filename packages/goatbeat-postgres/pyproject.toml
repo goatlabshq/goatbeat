@@ -11,7 +11,6 @@ keywords = ["scheduler", "cron", "periodic-tasks", "distributed", "django-tasks"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",

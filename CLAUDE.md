@@ -8,6 +8,8 @@ The design lives in `docs/superpowers/specs/2026-09-25-goatbeat-design.md`.
 - `packages/goatbeat-core`: framework-agnostic scheduler. Runtime imports are stdlib only; it
   must never import `django`, `celery`, `dramatiq`, `rq`, `psycopg`, `prometheus_client` or
   `opentelemetry` (`tests/test_boundaries.py` enforces it).
+- `packages/goatbeat-postgres`: production store. All coordination SQL lives in
+  `goatbeat/postgres/store.py`, typed `LiteralString`, behind the `ConnectionProvider` protocol.
 - `packages/goatbeat`: facade distribution. It alone owns `goatbeat/__init__.py`; every other
   package is a namespace portion (`goatbeat/core/`, ...). `pkgutil.extend_path` in that file makes
   editable installs work at runtime.
@@ -26,6 +28,10 @@ The design lives in `docs/superpowers/specs/2026-09-25-goatbeat-design.md`.
   (`release/`) bumps them all together. Add new packages to `release/config.json`.
 
 ## Commands
+
+PostgreSQL tests need `docker compose up -d --wait postgres` and
+`GOATBEAT_TEST_DATABASE_URL=postgresql://goatbeat:goatbeat@localhost:55432/goatbeat`; without the
+variable they are skipped. `-m distributed` and `-m performance` are excluded by default.
 
 ```bash
 uv sync

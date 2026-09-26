@@ -36,13 +36,29 @@ jobs:
         run: uvx --from "actionlint-py==${ACTIONLINT_VERSION}" actionlint
 
   test:
-    name: Test (Python ${{ matrix.python }}, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Test (Python ${{ matrix.python }}, PostgreSQL ${{ matrix.postgres }})
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
         python: ["3.13", "3.14"]
+        postgres: ["16", "17"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: goatbeat
+          POSTGRES_PASSWORD: goatbeat
+          POSTGRES_DB: goatbeat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U goatbeat"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      GOATBEAT_TEST_DATABASE_URL: postgresql://goatbeat:goatbeat@localhost:5432/goatbeat
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,6 +69,36 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv sync --all-packages
       - run: uv run pytest
+
+  test-macos:
+    name: Test (macOS, without PostgreSQL)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: uv run pytest
+
+  distributed:
+    name: Distributed, failure and performance tests
+    runs-on: ubuntu-latest
+    env:
+      GOATBEAT_TEST_DATABASE_URL: postgresql://goatbeat:goatbeat@localhost:55432/goatbeat
+      GOATBEAT_TEST_CAN_RESTART_DATABASE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: docker compose up -d --wait postgres
+      - run: uv run pytest -m "distributed or performance" -s tests/distributed tests/performance
 
   build:
     name: Build and validate packages
