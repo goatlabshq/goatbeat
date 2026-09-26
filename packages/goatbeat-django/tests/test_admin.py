@@ -151,3 +151,26 @@ def test_executions_are_read_only(admin_client: Client) -> None:
     assert listing.status_code == 200
     assert b"manual:x" in listing.content
     assert admin_client.get("/admin/goatbeat/execution/add/").status_code == 403
+
+
+def test_editing_a_store_schedule_updates_it_through_the_store(admin_client: Client) -> None:
+    assert admin_client.post(ADD, VALID_CRON).status_code == 302
+    created = store().get_schedule("nightly")
+    assert created is not None
+    url = f"{CHANGELIST}{created.id.value}/change/"
+    inline = {"executions-TOTAL_FORMS": "0", "executions-INITIAL_FORMS": "0"}
+    edited = VALID_CRON | {"cron": "30 4 * * *"} | inline
+    response = admin_client.post(url, edited)
+    assert response.status_code == 302, response.content
+    updated = store().get_schedule("nightly")
+    assert updated is not None
+    assert updated.id == created.id
+    assert isinstance(updated.definition.trigger, CronTrigger)
+    assert updated.definition.trigger.expression.text == "30 4 * * *"
+    assert updated.next_run_at == updated.definition.trigger.next_after(SystemClock().now())
+    disabled = edited | {"cron": "30 4 * * *"}
+    del disabled["enabled"]
+    assert admin_client.post(url, disabled).status_code == 302
+    paused = store().get_schedule("nightly")
+    assert paused is not None
+    assert not paused.definition.enabled

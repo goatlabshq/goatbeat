@@ -73,6 +73,9 @@ class ScheduleForm(ScheduleModelForm):
         cleaned = super().clean() or {}
         if self.errors:
             return cleaned
+        if self.instance.pk:
+            # The admin shows the name read-only on edit, so it is not posted back.
+            cleaned.setdefault("name", self.instance.name)
         try:
             self.definition = definition_from(cleaned)
         except (ConfigurationError, NaiveDatetimeError, ValueError) as error:
