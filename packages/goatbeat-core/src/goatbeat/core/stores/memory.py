@@ -142,21 +142,21 @@ class MemoryStore:
                 self._schedules[schedule.name] = replace(current, next_run_at=plan.next_run_at)
             return created
 
-    def claim_manual(
-        self, lease: Lease, schedule: Schedule, key: IdempotencyKey, now: Instant
+    def request_run(
+        self, schedule: Schedule, key: IdempotencyKey, requested_by: SchedulerId, now: Instant
     ) -> Execution:
         with self._changed:
-            self._ensure_fence(lease)
             execution = Execution(
                 schedule_id=schedule.id,
                 scheduled_at=now,
                 idempotency_key=key,
-                status=ExecutionStatus.CLAIMED,
-                scheduler_id=lease.holder,
-                fencing_token=lease.token,
+                status=ExecutionStatus.REQUESTED,
+                scheduler_id=requested_by,
+                fencing_token=_NO_TOKEN,
                 claimed_at=now,
             )
             self._executions.setdefault(key, execution)
+            self._changed.notify_all()
             return self._executions[key]
 
     def pending_submissions(
@@ -177,8 +177,9 @@ class MemoryStore:
             execution = self._executions[key]
             self._executions[key] = replace(
                 execution,
-                status=ExecutionStatus.DISPATCHED,
+                status=receipt.status,
                 dispatched_at=at,
+                completed_at=None if receipt.outcome is None else at,
                 backend_result_id=receipt.result_id,
                 next_retry_at=None,
                 error=None,
@@ -197,6 +198,19 @@ class MemoryStore:
                 error=error,
             )
             self._changed.notify_all()
+
+    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
+        with self._changed:
+            for key, execution in self._executions.items():
+                if (
+                    execution.backend_result_id == result_id
+                    and execution.status is ExecutionStatus.DISPATCHED
+                ):
+                    self._executions[key] = replace(
+                        execution, status=_finished(succeeded=succeeded), completed_at=at
+                    )
+                    return True
+            return False
 
     def next_wakeup(self) -> Instant | None:
         with self._changed:
@@ -275,7 +289,13 @@ class MemoryStore:
         )
 
 
+def _finished(*, succeeded: bool) -> ExecutionStatus:
+    return ExecutionStatus.COMPLETED if succeeded else ExecutionStatus.TASK_FAILED
+
+
 def _is_pending(execution: Execution, now: Instant, stale_before: Instant) -> bool:
+    if execution.status is ExecutionStatus.REQUESTED:
+        return True
     if execution.status is ExecutionStatus.CLAIMED:
         return execution.claimed_at <= stale_before
     if execution.status is ExecutionStatus.SUBMIT_FAILED:

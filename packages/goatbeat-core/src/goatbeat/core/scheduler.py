@@ -114,16 +114,12 @@ class Scheduler:
             )
 
     def run_now(self, name: str) -> Execution:
+        """Request an extra run; whichever instance leads dispatches it on its next tick."""
         schedule = self._store.get_schedule(name)
         if schedule is None:
             raise ConfigurationError(f"unknown schedule {name!r}")
-        lease = self._keeper.ensure()
-        if lease is None:
-            raise LeaseLostError("only the leader can run a schedule now")
         key = IdempotencyKey(f"manual:{uuid.uuid4().hex}")
-        execution = self._store.claim_manual(lease, schedule, key, self._clock.now())
-        self._submit(PendingSubmission(execution, schedule))
-        return execution
+        return self._store.request_run(schedule, key, self._config.scheduler_id, self._clock.now())
 
     def _resubmit_pending(self, lease: Lease) -> None:
         del lease  # submissions are recorded unfenced: the idempotency key protects them
@@ -196,7 +192,7 @@ class Scheduler:
             return
         now = self._clock.now()
         self._store.mark_dispatched(execution.idempotency_key, now, receipt)
-        self._metrics.occurrences(ExecutionStatus.DISPATCHED)
+        self._metrics.occurrences(receipt.status)
         self._metrics.dispatch_latency((now - execution.scheduled_at).total_seconds())
         log_event(
             self._logger,

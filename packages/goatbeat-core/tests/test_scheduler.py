@@ -239,15 +239,20 @@ def test_skipped_occurrences_are_recorded_but_not_submitted() -> None:
     assert len(submitter.submissions) == 1
 
 
-def test_run_now_dispatches_a_manual_occurrence() -> None:
+def test_a_run_requested_by_a_standby_is_dispatched_by_the_leader() -> None:
     clock = FakeClock()
     store = MemoryStore(clock)
-    submitter = RecordingSubmitter()
-    scheduler = make_scheduler(store, clock, submitter)
-    scheduler.tick()
-    execution = scheduler.run_now("job")
+    leader_backend, standby_backend = RecordingSubmitter(), RecordingSubmitter()
+    leader = make_scheduler(store, clock, leader_backend, "alice")
+    standby = make_scheduler(store, clock, standby_backend, "bob")
+    leader.tick()
+    execution = standby.run_now("job")
+    assert execution.status is ExecutionStatus.REQUESTED
     assert execution.idempotency_key.value.startswith("manual:")
-    assert keys(submitter.submissions) == [execution.idempotency_key.value]
+    standby.tick()
+    leader.tick()
+    assert keys(leader_backend.submissions) == [execution.idempotency_key.value]
+    assert standby_backend.submissions == []
 
 
 def test_an_unavailable_store_does_not_crash_the_tick() -> None:

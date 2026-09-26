@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS goatbeat_execution (
 );
 CREATE INDEX IF NOT EXISTS goatbeat_execution_history
     ON goatbeat_execution (schedule_id, scheduled_at_us);
+CREATE INDEX IF NOT EXISTS goatbeat_execution_result
+    ON goatbeat_execution (backend_result_id) WHERE backend_result_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS goatbeat_execution_pending
     ON goatbeat_execution (status, next_retry_at_us, claimed_at_us);
 CREATE TABLE IF NOT EXISTS goatbeat_lease (
@@ -286,25 +288,25 @@ class SQLiteStore:
             )
         return created
 
-    def claim_manual(
-        self, lease: Lease, schedule: Schedule, key: IdempotencyKey, now: Instant
+    def request_run(
+        self, schedule: Schedule, key: IdempotencyKey, requested_by: SchedulerId, now: Instant
     ) -> Execution:
         execution = Execution(
             schedule_id=schedule.id,
             scheduled_at=now,
             idempotency_key=key,
-            status=ExecutionStatus.CLAIMED,
-            scheduler_id=lease.holder,
-            fencing_token=lease.token,
+            status=ExecutionStatus.REQUESTED,
+            scheduler_id=requested_by,
+            fencing_token=FencingToken(0),
             claimed_at=now,
         )
         with self._write() as cursor:
-            self._ensure_fence(cursor, lease)
             self._insert_execution(cursor, execution)
             row = cursor.execute(
                 f"SELECT {_EXECUTION_COLUMNS} FROM goatbeat_execution WHERE idempotency_key = ?",
                 (key.value,),
             ).fetchone()
+        self._notify()
         return _execution(row)
 
     def pending_submissions(
@@ -315,10 +317,11 @@ class SQLiteStore:
         rows = self._read(
             f"SELECT {execution_columns}, {schedule_columns} FROM goatbeat_execution e "
             "JOIN goatbeat_schedule s ON s.id = e.schedule_id "
-            "WHERE (e.status = ? AND e.claimed_at_us <= ?) "
+            "WHERE e.status = ? OR (e.status = ? AND e.claimed_at_us <= ?) "
             "OR (e.status = ? AND e.next_retry_at_us <= ?) "
             "ORDER BY e.scheduled_at_us LIMIT ?",
             (
+                ExecutionStatus.REQUESTED.value,
                 ExecutionStatus.CLAIMED.value,
                 stale_before.timestamp_us,
                 ExecutionStatus.SUBMIT_FAILED.value,
@@ -333,9 +336,15 @@ class SQLiteStore:
         with self._write() as cursor:
             cursor.execute(
                 "UPDATE goatbeat_execution SET status = ?, dispatched_at_us = ?, "
-                "backend_result_id = ?, next_retry_at_us = NULL, error = NULL "
-                "WHERE idempotency_key = ?",
-                (ExecutionStatus.DISPATCHED.value, at.timestamp_us, receipt.result_id, key.value),
+                "completed_at_us = ?, backend_result_id = ?, next_retry_at_us = NULL, "
+                "error = NULL WHERE idempotency_key = ?",
+                (
+                    receipt.status.value,
+                    at.timestamp_us,
+                    None if receipt.outcome is None else at.timestamp_us,
+                    receipt.result_id,
+                    key.value,
+                ),
             )
 
     def mark_submit_failed(self, key: IdempotencyKey, error: str, retry_at: Instant | None) -> None:
@@ -352,6 +361,16 @@ class SQLiteStore:
                 ),
             )
         self._notify()
+
+    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
+        status = ExecutionStatus.COMPLETED if succeeded else ExecutionStatus.TASK_FAILED
+        with self._write() as cursor:
+            cursor.execute(
+                "UPDATE goatbeat_execution SET status = ?, completed_at_us = ? "
+                "WHERE backend_result_id = ? AND status = ?",
+                (status.value, at.timestamp_us, result_id, ExecutionStatus.DISPATCHED.value),
+            )
+            return cursor.rowcount > 0
 
     def next_wakeup(self) -> Instant | None:
         rows = self._read(

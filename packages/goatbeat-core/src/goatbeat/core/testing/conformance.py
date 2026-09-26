@@ -23,6 +23,7 @@ TTL: Final = timedelta(seconds=30)
 MINUTE: Final = timedelta(minutes=1)
 ALICE: Final = SchedulerId("alice")
 BOB: Final = SchedulerId("bob")
+REQUESTER: Final = SchedulerId("admin:alice")
 
 
 @dataclass(frozen=True, slots=True)
@@ -279,31 +280,68 @@ class StoreConformance(ABC):
         assert execution.status is ExecutionStatus.SKIPPED
         assert execution.missed_count == 7
 
-    def test_manual_claim_uses_the_given_key(self) -> None:
+    def test_a_requested_run_is_pending_immediately_without_a_lease(self) -> None:
         sut = self._setup()
         schedule = self._saved(sut)
-        lease = self._leader(sut)
         key = IdempotencyKey("manual:1234")
-        execution = sut.store.claim_manual(lease, schedule, key, sut.clock.now())
+        execution = sut.store.request_run(schedule, key, REQUESTER, sut.clock.now())
         assert execution.idempotency_key == key
-        assert execution.status is ExecutionStatus.CLAIMED
+        assert execution.status is ExecutionStatus.REQUESTED
+        assert execution.scheduler_id == REQUESTER
+        now = sut.clock.now()
+        [pending] = sut.store.pending_submissions(now, stale_before=now - TTL, limit=10)
+        assert pending.execution.idempotency_key == key
+        sut.store.mark_dispatched(key, now, SubmissionReceipt("r"))
+        assert sut.store.pending_submissions(now, stale_before=now - TTL, limit=10) == []
         assert sut.store.get_schedule("job") == schedule
 
-    def test_manual_run_at_an_occurrence_instant_does_not_hide_it(self) -> None:
+    def test_requesting_the_same_key_twice_keeps_one_execution(self) -> None:
+        sut = self._setup()
+        schedule = self._saved(sut)
+        key = IdempotencyKey("manual:1")
+        first = sut.store.request_run(schedule, key, REQUESTER, sut.clock.now())
+        again = sut.store.request_run(schedule, key, REQUESTER, sut.clock.advance(MINUTE))
+        assert again == first
+
+    def test_a_requested_run_at_an_occurrence_instant_does_not_hide_it(self) -> None:
         sut = self._setup()
         schedule = self._saved(sut)
         now = sut.clock.set_and_get(schedule.next_run_at)
         lease = self._leader(sut)
-        sut.store.claim_manual(lease, schedule, IdempotencyKey("manual:1"), now)
+        sut.store.request_run(schedule, IdempotencyKey("manual:1"), REQUESTER, now)
         assert len(sut.store.claim(lease, schedule, one_claim(schedule), now)) == 1
-        later = sut.store.get_schedule("job")
-        assert later is not None
-        next_at = sut.clock.set_and_get(later.next_run_at)
+        assert len(sut.store.recent_executions(schedule.id, limit=10)) == 2
+
+    # Completion
+
+    def test_an_outcome_known_at_dispatch_is_recorded(self) -> None:
+        sut = self._setup()
+        schedule = self._saved(sut)
+        now = sut.clock.advance(MINUTE)
         lease = self._leader(sut)
-        sut.store.claim(lease, later, one_claim(later), next_at)
-        manual = sut.store.claim_manual(lease, later, IdempotencyKey("manual:2"), later.next_run_at)
-        assert manual.idempotency_key == IdempotencyKey("manual:2")
-        assert len(sut.store.recent_executions(schedule.id, limit=10)) == 4
+        [execution] = sut.store.claim(lease, schedule, one_claim(schedule), now)
+        receipt = SubmissionReceipt("r-1", outcome=ExecutionStatus.TASK_FAILED)
+        sut.store.mark_dispatched(execution.idempotency_key, now, receipt)
+        [stored] = sut.store.recent_executions(schedule.id, limit=1)
+        assert stored.status is ExecutionStatus.TASK_FAILED
+        assert stored.dispatched_at == now
+        assert stored.completed_at == now
+
+    def test_completion_reported_later_moves_only_dispatched_executions(self) -> None:
+        sut = self._setup()
+        schedule = self._saved(sut)
+        now = sut.clock.advance(MINUTE)
+        lease = self._leader(sut)
+        [execution] = sut.store.claim(lease, schedule, one_claim(schedule), now)
+        assert not sut.store.record_completion("r-1", succeeded=True, at=now)
+        sut.store.mark_dispatched(execution.idempotency_key, now, SubmissionReceipt("r-1"))
+        done = sut.clock.advance(MINUTE)
+        assert sut.store.record_completion("r-1", succeeded=True, at=done)
+        assert not sut.store.record_completion("r-1", succeeded=False, at=done)
+        assert not sut.store.record_completion("unknown", succeeded=True, at=done)
+        [stored] = sut.store.recent_executions(schedule.id, limit=1)
+        assert stored.status is ExecutionStatus.COMPLETED
+        assert stored.completed_at == done
 
     # Submissions
 

@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Final, LiteralString
 
-from goatbeat.core.errors import ConfigurationError, LeaseLostError
+from goatbeat.core.errors import ConfigurationError, LeaseLostError, StoreUnavailableError
 from goatbeat.core.execution import (
     Execution,
     ExecutionStatus,
@@ -235,25 +235,25 @@ class PostgresStore:
         )
         return created
 
-    def claim_manual(
-        self, lease: Lease, schedule: Schedule, key: IdempotencyKey, now: Instant
+    def request_run(
+        self, schedule: Schedule, key: IdempotencyKey, requested_by: SchedulerId, now: Instant
     ) -> Execution:
         execution = Execution(
             schedule_id=schedule.id,
             scheduled_at=now,
             idempotency_key=key,
-            status=ExecutionStatus.CLAIMED,
-            scheduler_id=lease.holder,
-            fencing_token=lease.token,
+            status=ExecutionStatus.REQUESTED,
+            scheduler_id=requested_by,
+            fencing_token=FencingToken(0),
             claimed_at=now,
         )
         with self._provider.transaction() as cursor:
-            self._ensure_fence(cursor, lease)
             cursor.execute(_INSERT_EXECUTION, _execution_values(execution))
             cursor.execute(_SELECT_EXECUTION + "WHERE idempotency_key = %s", [key.value])
             row = cursor.fetchone()
+            cursor.execute(_NOTIFY)
         if row is None:
-            raise LeaseLostError(f"manual execution {key.value} was not recorded")
+            raise StoreUnavailableError(f"requested run {key.value} was not recorded")
         return _execution(row)
 
     def pending_submissions(
@@ -269,10 +269,11 @@ class PostgresStore:
                 "s.misfire_policy, s.misfire_grace_us, s.max_catch_up, s.queue, s.priority, "
                 "s.backend, s.enabled, s.next_run_at "
                 "FROM goatbeat_execution e JOIN goatbeat_schedule s ON s.id = e.schedule_id "
-                "WHERE (e.status = %s AND e.claimed_at <= %s) "
+                "WHERE e.status = %s OR (e.status = %s AND e.claimed_at <= %s) "
                 "OR (e.status = %s AND e.next_retry_at <= %s) "
                 "ORDER BY e.scheduled_at LIMIT %s",
                 [
+                    ExecutionStatus.REQUESTED.value,
                     ExecutionStatus.CLAIMED.value,
                     stale_before.datetime,
                     ExecutionStatus.SUBMIT_FAILED.value,
@@ -293,9 +294,15 @@ class PostgresStore:
         with self._provider.transaction() as cursor:
             cursor.execute(
                 "UPDATE goatbeat_execution SET status = %s, dispatched_at = %s, "
-                "backend_result_id = %s, next_retry_at = NULL, error = NULL "
+                "completed_at = %s, backend_result_id = %s, next_retry_at = NULL, error = NULL "
                 "WHERE idempotency_key = %s",
-                [ExecutionStatus.DISPATCHED.value, at.datetime, receipt.result_id, key.value],
+                [
+                    receipt.status.value,
+                    at.datetime,
+                    None if receipt.outcome is None else at.datetime,
+                    receipt.result_id,
+                    key.value,
+                ],
             )
 
     def mark_submit_failed(self, key: IdempotencyKey, error: str, retry_at: Instant | None) -> None:
@@ -306,6 +313,16 @@ class PostgresStore:
                 "next_retry_at = %s, error = %s WHERE idempotency_key = %s",
                 [status.value, None if retry_at is None else retry_at.datetime, error, key.value],
             )
+
+    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
+        status = ExecutionStatus.COMPLETED if succeeded else ExecutionStatus.TASK_FAILED
+        with self._provider.transaction() as cursor:
+            cursor.execute(
+                "UPDATE goatbeat_execution SET status = %s, completed_at = %s "
+                "WHERE backend_result_id = %s AND status = %s",
+                [status.value, at.datetime, result_id, ExecutionStatus.DISPATCHED.value],
+            )
+            return cursor.rowcount > 0
 
     def next_wakeup(self) -> Instant | None:
         with self._provider.transaction() as cursor:

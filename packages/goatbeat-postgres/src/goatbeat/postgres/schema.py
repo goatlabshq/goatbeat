@@ -70,6 +70,10 @@ _V1: Final[tuple[LiteralString, ...]] = (
         "ON goatbeat_execution (next_retry_at) WHERE status = 'submit_failed'"
     ),
     (
+        "CREATE INDEX goatbeat_execution_requested "
+        "ON goatbeat_execution (claimed_at) WHERE status = 'requested'"
+    ),
+    (
         "CREATE INDEX goatbeat_execution_claimed "
         "ON goatbeat_execution (claimed_at) WHERE status = 'claimed'"
     ),

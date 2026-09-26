@@ -43,9 +43,11 @@ class ScheduleStore(Protocol):
         """Atomically fence-check, insert new executions and advance the schedule."""
         ...
 
-    def claim_manual(
-        self, lease: Lease, schedule: Schedule, key: IdempotencyKey, now: Instant
-    ) -> Execution: ...
+    def request_run(
+        self, schedule: Schedule, key: IdempotencyKey, requested_by: SchedulerId, now: Instant
+    ) -> Execution:
+        """Ask the leader to dispatch now; needs no lease, so any process can call it."""
+        ...
 
     def pending_submissions(
         self, now: Instant, stale_before: Instant, limit: int
@@ -58,6 +60,10 @@ class ScheduleStore(Protocol):
     def mark_submit_failed(
         self, key: IdempotencyKey, error: str, retry_at: Instant | None
     ) -> None: ...
+
+    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
+        """Finish a dispatched execution by its backend result id; False if none matched."""
+        ...
 
     def next_wakeup(self) -> Instant | None: ...
 

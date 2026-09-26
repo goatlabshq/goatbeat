@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
 from goatbeat.core.ids import FencingToken, IdempotencyKey, ScheduleId, SchedulerId
 from goatbeat.core.time import Instant
 
 
 class ExecutionStatus(StrEnum):
+    REQUESTED = "requested"
     CLAIMED = "claimed"
     DISPATCHED = "dispatched"
     SUBMIT_FAILED = "submit_failed"
@@ -41,9 +43,19 @@ class Execution:
     error: str | None = None
 
 
+type TaskOutcome = Literal[ExecutionStatus.COMPLETED, ExecutionStatus.TASK_FAILED]
+
+
 @dataclass(frozen=True, slots=True)
 class SubmissionReceipt:
+    """``outcome`` is set when the backend already ran the task (an immediate backend)."""
+
     result_id: str | None = None
+    outcome: TaskOutcome | None = None
+
+    @property
+    def status(self) -> ExecutionStatus:
+        return ExecutionStatus.DISPATCHED if self.outcome is None else self.outcome
 
 
 def idempotency_key_for(schedule_id: ScheduleId, scheduled_at: Instant) -> IdempotencyKey:
