@@ -1,6 +1,8 @@
 import psycopg
 import pytest
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
+from goatbeat.core.errors import StoreUnavailableError
 from goatbeat.postgres.provider import PsycopgProvider
 from goatbeat.postgres.schema import SCHEMA_VERSION, migrate
 
@@ -50,3 +52,16 @@ def test_a_failing_transaction_rolls_back(conninfo: str) -> None:
     ):
         create_then_fail(provider)
     assert "goatbeat_probe" not in tables(conninfo)
+
+
+def test_a_read_only_database_is_reported_as_unavailable(conninfo: str) -> None:
+    with PsycopgProvider.connect(conninfo) as provider:
+        migrate(provider)
+    options = f"{conninfo_to_dict(conninfo)['options']} -c default_transaction_read_only=on"
+    read_only = make_conninfo(conninfo, options=options)
+    with (
+        PsycopgProvider.connect(read_only) as provider,
+        pytest.raises(StoreUnavailableError),
+        provider.transaction() as cursor,
+    ):
+        cursor.execute("UPDATE goatbeat_lease SET holder_id = NULL")

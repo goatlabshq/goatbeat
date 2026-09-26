@@ -3,13 +3,32 @@
 from collections.abc import Generator, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from types import TracebackType
-from typing import LiteralString, Protocol, Self
+from typing import Final, LiteralString, Protocol, Self
 
 import psycopg
 from psycopg.rows import TupleRow
 from psycopg_pool import ConnectionPool, PoolTimeout
 
 from goatbeat.core.errors import StoreUnavailableError
+
+# Errors meaning "this database cannot serve us right now": a promoted replica still read-only,
+# a session the server ended, a lost connection.
+UNAVAILABLE_ERRORS: Final = (
+    psycopg.OperationalError,
+    psycopg.InterfaceError,
+    psycopg.errors.ReadOnlySqlTransaction,
+    psycopg.errors.IdleInTransactionSessionTimeout,
+    PoolTimeout,
+)
+CONNECT_TIMEOUT_SECONDS: Final = 5
+POOL_WAIT_SECONDS: Final = 10.0
+# Detect half-open connections (network partition) in about a minute instead of hours.
+KEEPALIVES: Final = {
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 3,
+}
 
 
 class Cursor(Protocol):
@@ -44,8 +63,11 @@ class PsycopgProvider:
         pool = ConnectionPool(
             conninfo,
             connection_class=psycopg.Connection[TupleRow],
+            kwargs={"connect_timeout": CONNECT_TIMEOUT_SECONDS, **KEEPALIVES},
             min_size=min_size,
             max_size=max_size,
+            timeout=POOL_WAIT_SECONDS,
+            check=ConnectionPool.check_connection,
             open=False,
         )
         pool.open()
@@ -60,7 +82,7 @@ class PsycopgProvider:
                 connection.cursor() as cursor,
             ):
                 yield cursor
-        except (psycopg.OperationalError, psycopg.InterfaceError, PoolTimeout) as error:
+        except UNAVAILABLE_ERRORS as error:
             raise StoreUnavailableError(str(error)) from error
 
     def close(self) -> None:
