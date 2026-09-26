@@ -55,6 +55,8 @@ ignore = ["PLR0913", "PLR2004"]
 "**/goatbeat/core/testing/conformance.py" = ["S101"]
 # SQL text only interpolates column lists from module constants; values are always bound.
 "**/goatbeat/core/stores/sqlite.py" = ["S608"]
+# Queries are typed LiteralString, so pyright rejects any SQL built from runtime values.
+"**/goatbeat/postgres/store.py" = ["S608"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["goatbeat"]
