@@ -12,10 +12,12 @@ dependencies = []
 dev = [
     "goatbeat",
     "goatbeat-core",
+    "goatbeat-postgres",
     "croniter>=6.0",
     "hypothesis>=6.140",
     "lefthook>=1.11",
     "pyright[nodejs]>=1.1.405",
+    "psycopg[binary]>=3.2",
     "pytest>=8.4",
     "ruff>=0.13",
     "twine>=6.2",
@@ -32,6 +34,7 @@ members = ["packages/*"]
 [tool.uv.sources]
 goatbeat = { workspace = true }
 goatbeat-core = { workspace = true }
+goatbeat-postgres = { workspace = true }
 
 [tool.ruff]
 target-version = "py313"
@@ -71,6 +74,10 @@ reportMissingModuleSource = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
 
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib", "-ra", "--strict-markers", "--strict-config"]
+addopts = ["--import-mode=importlib", "-ra", "--strict-markers", "--strict-config", "-m", "not distributed and not performance"]
+markers = [
+    "distributed: multi-process and failure-injection tests against PostgreSQL",
+    "performance: large-volume benchmarks against PostgreSQL",
+]
 testpaths = ["packages", "tests"]
 filterwarnings = ["error"]

@@ -10,7 +10,8 @@
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         "packages/goatbeat/pyproject.toml",
-        "packages/goatbeat-core/pyproject.toml"
+        "packages/goatbeat-core/pyproject.toml",
+        "packages/goatbeat-postgres/pyproject.toml"
       ]
     }
   }

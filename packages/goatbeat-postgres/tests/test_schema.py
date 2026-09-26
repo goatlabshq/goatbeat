@@ -1,0 +1,52 @@
+import psycopg
+import pytest
+
+from goatbeat.postgres.provider import PsycopgProvider
+from goatbeat.postgres.schema import SCHEMA_VERSION, migrate
+
+
+def tables(conninfo: str) -> set[str]:
+    with psycopg.connect(conninfo) as connection:
+        rows = connection.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()"
+        ).fetchall()
+    return {row[0] for row in rows}
+
+
+def test_migrate_creates_the_schema_once(conninfo: str) -> None:
+    with PsycopgProvider.connect(conninfo) as provider:
+        assert migrate(provider) == SCHEMA_VERSION
+        assert migrate(provider) == SCHEMA_VERSION
+    assert {
+        "goatbeat_schedule",
+        "goatbeat_execution",
+        "goatbeat_lease",
+        "goatbeat_schema_version",
+    } <= tables(conninfo)
+
+
+def test_due_index_is_partial_on_enabled(conninfo: str) -> None:
+    with PsycopgProvider.connect(conninfo) as provider:
+        migrate(provider)
+    with psycopg.connect(conninfo) as connection:
+        row = connection.execute(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'goatbeat_schedule_due' "
+            "AND schemaname = current_schema()"
+        ).fetchone()
+    assert row is not None
+    assert "WHERE enabled" in row[0]
+
+
+def create_then_fail(provider: PsycopgProvider) -> None:
+    with provider.transaction() as cursor:
+        cursor.execute("CREATE TABLE goatbeat_probe (id int)")
+        cursor.execute("SELECT * FROM missing_table")
+
+
+def test_a_failing_transaction_rolls_back(conninfo: str) -> None:
+    with (
+        PsycopgProvider.connect(conninfo) as provider,
+        pytest.raises(psycopg.errors.UndefinedTable),
+    ):
+        create_then_fail(provider)
+    assert "goatbeat_probe" not in tables(conninfo)
