@@ -33,10 +33,9 @@ from goatbeat.core.serialization import (
 )
 from goatbeat.core.submission import PendingSubmission
 from goatbeat.core.time import Clock, Instant
-from goatbeat.postgres.notify import Notifier
+from goatbeat.postgres.notify import CHANNEL, Notifier
 from goatbeat.postgres.provider import ConnectionProvider, Cursor
 
-CHANNEL: Final = "goatbeat_schedule_changed"
 _PARTITION: Final = 0
 _MICROSECOND: Final = timedelta(microseconds=1)
 # NULL means "use the database clock"; only tests pass an explicit instant.
