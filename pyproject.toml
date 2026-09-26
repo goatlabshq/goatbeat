@@ -13,12 +13,15 @@ dev = [
     "goatbeat",
     "goatbeat-core",
     "goatbeat-postgres",
+    "goatbeat-django",
     "croniter>=6.0",
+    "django-stubs>=6.1",
     "hypothesis>=6.140",
     "lefthook>=1.11",
     "pyright[nodejs]>=1.1.405",
     "psycopg[binary]>=3.2",
     "pytest>=8.4",
+    "pytest-django>=4.14",
     "ruff>=0.13",
     "twine>=6.2",
     "types-croniter>=6.0",
@@ -35,6 +38,7 @@ members = ["packages/*"]
 goatbeat = { workspace = true }
 goatbeat-core = { workspace = true }
 goatbeat-postgres = { workspace = true }
+goatbeat-django = { workspace = true }
 
 [tool.ruff]
 target-version = "py313"
@@ -61,6 +65,7 @@ ignore = ["PLR0913", "PLR2004"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["goatbeat"]
+known-third-party = ["django"]
 
 [tool.ruff.format]
 docstring-code-format = true

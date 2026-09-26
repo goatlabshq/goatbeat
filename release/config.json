@@ -11,7 +11,8 @@
       "extra-files": [
         "packages/goatbeat/pyproject.toml",
         "packages/goatbeat-core/pyproject.toml",
-        "packages/goatbeat-postgres/pyproject.toml"
+        "packages/goatbeat-postgres/pyproject.toml",
+        "packages/goatbeat-django/pyproject.toml"
       ]
     }
   }
