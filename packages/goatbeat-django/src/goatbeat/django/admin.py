@@ -148,17 +148,17 @@ class ScheduleAdmin(ScheduleModelAdmin):
     def last_status(self, obj: Schedule) -> str:
         return str(getattr(obj, LAST_STATUS, None) or "")
 
-    @admin.action(description="Enable selected schedules")
+    @admin.action(description="Enable selected schedules", permissions=["change"])
     def enable_schedules(self, request: HttpRequest, queryset: QuerySet[Schedule]) -> None:
         del request
         _set_enabled(queryset, enabled=True)
 
-    @admin.action(description="Disable selected schedules")
+    @admin.action(description="Disable selected schedules", permissions=["change"])
     def disable_schedules(self, request: HttpRequest, queryset: QuerySet[Schedule]) -> None:
         del request
         _set_enabled(queryset, enabled=False)
 
-    @admin.action(description="Run selected schedules now")
+    @admin.action(description="Run selected schedules now", permissions=["change"])
     def run_schedules_now(self, request: HttpRequest, queryset: QuerySet[Schedule]) -> None:
         backend = store()
         requester = SchedulerId(f"admin:{request.user.get_username()}")

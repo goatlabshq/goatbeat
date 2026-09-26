@@ -1,5 +1,5 @@
 import pytest
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.db import connection
 from django.test import Client
 
@@ -174,3 +174,18 @@ def test_editing_a_store_schedule_updates_it_through_the_store(admin_client: Cli
     paused = store().get_schedule("nightly")
     assert paused is not None
     assert not paused.definition.enabled
+
+
+@pytest.mark.usefixtures("admin_client")
+def test_view_only_staff_cannot_run_actions() -> None:
+    viewer = User.objects.create_user("viewer", is_staff=True)
+    viewer.user_permissions.add(Permission.objects.get(codename="view_schedule"))
+    client = Client()
+    client.force_login(viewer)
+    selected = [schedule_id("ping")]
+    client.post(CHANGELIST, {"action": "disable_schedules", "_selected_action": selected})
+    client.post(CHANGELIST, {"action": "run_schedules_now", "_selected_action": selected})
+    ping = store().get_schedule("ping")
+    assert ping is not None
+    assert ping.definition.enabled
+    assert store().recent_executions(None, limit=1) == []
