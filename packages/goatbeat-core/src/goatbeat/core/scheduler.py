@@ -15,7 +15,7 @@ from goatbeat.core.lease_keeper import LeaseKeeper
 from goatbeat.core.misfire import plan_occurrences
 from goatbeat.core.observability import LOGGER_NAME, Event, MetricsSink, NoopMetrics, log_event
 from goatbeat.core.protocols import LeaseManager, ScheduleStore, TaskSubmitter
-from goatbeat.core.registry import Registry
+from goatbeat.core.registry import SupportsDefinitions
 from goatbeat.core.schedule import Schedule
 from goatbeat.core.submission import PendingSubmission
 from goatbeat.core.time import Clock, Instant, SystemClock
@@ -39,7 +39,7 @@ class Scheduler:
         leases: LeaseManager,
         submitter: TaskSubmitter,
         config: GoatbeatConfig,
-        registry: Registry | None = None,
+        registry: SupportsDefinitions | None = None,
         clock: Clock | None = None,
         metrics: MetricsSink | None = None,
         logger: logging.Logger | None = None,

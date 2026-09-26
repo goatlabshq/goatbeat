@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Final, Literal, overload
+from typing import Final, Literal, Protocol, overload
 from zoneinfo import ZoneInfo
 
 from goatbeat.core.durations import parse_duration
@@ -18,6 +18,12 @@ DEFAULT_INTERVAL_ANCHOR: Final = Instant.of(datetime(1970, 1, 1, tzinfo=UTC))
 
 type TaskLike = Callable[[], object] | TaskCall
 type MisfirePolicyName = MisfirePolicy | Literal["run_once", "skip", "catch_up"]
+
+
+class SupportsDefinitions(Protocol):
+    """Anything that declares schedules: the core registry or a framework adapter's."""
+
+    def definitions(self) -> tuple[ScheduleDefinition, ...]: ...
 
 
 class Registry:
