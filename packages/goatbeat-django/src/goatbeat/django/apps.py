@@ -3,13 +3,16 @@ from typing import Final, override
 
 from django.apps import AppConfig, apps
 from django.core.exceptions import ImproperlyConfigured
+from django.tasks.signals import task_finished
 from django.utils.module_loading import module_has_submodule
 
 from goatbeat.django.conf import DjangoSettings
 from goatbeat.django.registry import DjangoRegistry
+from goatbeat.django.signals import record_task_completion
 
 SCHEDULES_MODULE: Final = "schedules"
 REGISTER_FUNCTION: Final = "register"
+COMPLETION_RECEIVER: Final = "goatbeat.record_task_completion"
 
 
 class GoatbeatConfig(AppConfig):
@@ -25,6 +28,7 @@ class GoatbeatConfig(AppConfig):
         self.registry = DjangoRegistry(timezone=settings.config.timezone)
         for app in apps.get_app_configs():
             _register_schedules_of(app, self.registry)
+        task_finished.connect(record_task_completion, dispatch_uid=COMPLETION_RECEIVER)
 
 
 def _register_schedules_of(app: AppConfig, beat: DjangoRegistry) -> None:
