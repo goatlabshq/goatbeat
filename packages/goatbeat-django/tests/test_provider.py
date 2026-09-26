@@ -1,5 +1,6 @@
 from typing import LiteralString
 
+import psycopg
 import pytest
 from django.db import ProgrammingError, connection
 
@@ -7,6 +8,7 @@ from goatbeat.core.errors import StoreUnavailableError
 from goatbeat.core.testing import FakeClock, StoreConformance, StoreUnderTest
 from goatbeat.django.provider import DjangoProvider
 from goatbeat.postgres.store import PostgresStore
+from goatbeat.postgres.testing import database_url_from_env
 
 SEED_LEASE = (
     "INSERT INTO goatbeat_lease (partition, holder_id, fencing_token, expires_at) "
@@ -52,3 +54,30 @@ def test_a_read_only_database_is_reported_as_unavailable() -> None:
 def test_an_unknown_alias_is_rejected() -> None:
     with pytest.raises(StoreUnavailableError):
         DjangoProvider("nope")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_consecutive_transactions_reuse_the_connection() -> None:
+    provider = DjangoProvider()
+    with provider.transaction() as cursor:
+        cursor.execute("SELECT pg_backend_pid()")
+        first = cursor.fetchone()
+    with provider.transaction() as cursor:
+        cursor.execute("SELECT pg_backend_pid()")
+        assert cursor.fetchone() == first
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_connection_killed_by_the_server_is_replaced() -> None:
+    provider = DjangoProvider()
+    with provider.transaction() as cursor:
+        cursor.execute("SELECT pg_backend_pid()")
+        row = cursor.fetchone()
+    assert row is not None
+    with psycopg.connect(str(database_url_from_env())) as admin:
+        admin.execute("SELECT pg_terminate_backend(%s)", [row[0]])
+    with pytest.raises(StoreUnavailableError), provider.transaction() as cursor:
+        cursor.execute("SELECT 1")
+    with provider.transaction() as cursor:
+        cursor.execute("SELECT 1")
+        assert cursor.fetchone() == (1,)

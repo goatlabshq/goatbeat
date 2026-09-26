@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from typing import cast
 
 from django.db import DatabaseError, InterfaceError, OperationalError, connections, transaction
+from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils.connection import ConnectionDoesNotExist
 from psycopg.conninfo import make_conninfo
 
@@ -24,8 +25,7 @@ class DjangoProvider:
     def transaction(self) -> Generator[Cursor]:
         connection = connections[self._alias]
         if not connection.in_atomic_block:
-            # What Django does between requests: the scheduler thread never gets that hook.
-            connection.close_if_unusable_or_obsolete()
+            _drop_if_broken(connection)
         try:
             with transaction.atomic(using=self._alias), connection.cursor() as cursor:
                 yield cast("Cursor", cursor)
@@ -33,6 +33,18 @@ class DjangoProvider:
             if _is_unavailable(error):
                 raise StoreUnavailableError(str(error)) from error
             raise
+
+
+def _drop_if_broken(connection: BaseDatabaseWrapper) -> None:
+    """Replace a connection only after it failed; CONN_MAX_AGE would reconnect every call.
+
+    The scheduler thread never gets Django's between-requests hook, so it checks here.
+    """
+    if connection.errors_occurred:
+        if connection.is_usable():
+            connection.errors_occurred = False
+        else:
+            connection.close()
 
 
 def notifier_conninfo(alias: str = "default") -> str:
