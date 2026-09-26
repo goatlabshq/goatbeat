@@ -176,3 +176,28 @@ def test_the_database_ends_a_fence_holder_that_stays_idle(conninfo: str) -> None
             claim_then_freeze(frozen, store, lease, schedule, clock)
         clock.advance(TTL * 2)
         assert PostgresStore(other, lease_clock=clock).acquire(SchedulerId("bob"), TTL)
+
+
+def test_schedulers_starting_together_sync_without_conflicts(conninfo: str) -> None:
+    clock = FakeClock()
+    definitions = [every_minute(f"job-{index:02}", clock) for index in range(20)]
+    with PsycopgProvider.connect(conninfo, min_size=8, max_size=8) as provider:
+        migrate(provider)
+        barrier = threading.Barrier(8)
+        errors: list[BaseException] = []
+
+        def start(order: int) -> None:
+            ordered = definitions[order:] + definitions[:order]  # versions list them differently
+            barrier.wait()
+            try:
+                PostgresStore(provider).sync_code_schedules(ordered, clock.now())
+            except BaseException as error:
+                errors.append(error)
+
+        threads = [threading.Thread(target=start, args=(order,)) for order in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert errors == []
+        assert len(PostgresStore(provider).list_schedules()) == 20

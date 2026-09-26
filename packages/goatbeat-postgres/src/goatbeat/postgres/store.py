@@ -80,6 +80,8 @@ DEFAULT_FENCE_IDLE_TIMEOUT: Final = timedelta(seconds=10)
 # set_config(..., true) is SET LOCAL with bindable values: it ends with the transaction.
 _SET_LOCK_TIMEOUT: Final = "SELECT set_config('lock_timeout', %s, true)"
 _SET_IDLE_TIMEOUT: Final = "SELECT set_config('idle_in_transaction_session_timeout', %s, true)"
+# Row locks cannot guard names that do not exist yet: concurrent first starts would both insert.
+_LOCK_SCHEDULE_WRITES: Final = "SELECT pg_advisory_xact_lock(hashtext('goatbeat.schedules'))"
 _NOTIFY: Final = "SELECT pg_notify('" + CHANNEL + "', '')"
 
 
@@ -141,7 +143,8 @@ class PostgresStore:
         self, definitions: Sequence[ScheduleDefinition], now: Instant, *, prune: bool = False
     ) -> None:
         with self._provider.transaction() as cursor:
-            for definition in definitions:
+            cursor.execute(_LOCK_SCHEDULE_WRITES)
+            for definition in sorted(definitions, key=lambda item: item.name):
                 existing = self._schedule_by_name(cursor, definition.name, lock=True)
                 if existing is None:
                     self._insert(cursor, definition, ScheduleSource.CODE, now)
@@ -158,6 +161,7 @@ class PostgresStore:
 
     def save_schedule(self, definition: ScheduleDefinition, now: Instant) -> Schedule:
         with self._provider.transaction() as cursor:
+            cursor.execute(_LOCK_SCHEDULE_WRITES)
             existing = self._schedule_by_name(cursor, definition.name, lock=True)
             if existing is not None and existing.source is ScheduleSource.CODE:
                 raise ConfigurationError(f"schedule {definition.name!r} is declared in code")
