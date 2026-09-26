@@ -10,7 +10,9 @@ type JsonValue = str | int | float | bool | list[JsonValue] | dict[str, JsonValu
 
 
 def ensure_json(value: object) -> JsonValue:
-    if value is None or isinstance(value, bool | int | str):
+    if isinstance(value, str):
+        return _ensure_text(value)
+    if value is None or isinstance(value, bool | int):
         return value
     if isinstance(value, float):
         if not math.isfinite(value):
@@ -28,5 +30,12 @@ def _ensure_object(value: Mapping[object, object]) -> dict[str, JsonValue]:
     for key, item in value.items():
         if not isinstance(key, str):
             raise ConfigurationError(f"JSON object keys must be strings, got {key!r}")
-        items[key] = ensure_json(item)
+        items[_ensure_text(key)] = ensure_json(item)
     return items
+
+
+def _ensure_text(value: str) -> str:
+    """PostgreSQL jsonb cannot store NUL, so no store may accept it."""
+    if "\x00" in value:
+        raise ConfigurationError(f"{value!r} contains a NUL character")
+    return value

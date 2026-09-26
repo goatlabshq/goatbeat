@@ -42,8 +42,8 @@ def definition_to_columns(definition: ScheduleDefinition) -> DefinitionColumns:
     return DefinitionColumns(
         name=definition.name,
         task_path=definition.task.path,
-        task_args=json.dumps(list(definition.task.args)),
-        task_kwargs=json.dumps(dict(definition.task.kwargs)),
+        task_args=json.dumps(list(definition.task.args), allow_nan=False),
+        task_kwargs=json.dumps(dict(definition.task.kwargs), allow_nan=False),
         trigger_kind=INTERVAL if interval else CRON,
         interval=interval.every if interval else None,
         start_at=interval.start_at if interval else None,

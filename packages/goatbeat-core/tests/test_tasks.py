@@ -54,3 +54,14 @@ def test_import_task_resolves_functions_and_nested_attributes() -> None:
 def test_import_task_reports_missing_tasks(path: str) -> None:
     with pytest.raises(TaskNotFoundError):
         import_task(path)
+
+
+@pytest.mark.parametrize(
+    ("args", "kwargs"),
+    [((float("nan"),), {}), ((), {"x": float("inf")}), (("a\x00",), {})],
+)
+def test_a_task_call_cannot_hold_unstorable_arguments(
+    args: tuple[object, ...], kwargs: dict[str, object]
+) -> None:
+    with pytest.raises(ConfigurationError):
+        TaskCall("sample_tasks.send_email", args, kwargs)  # pyright: ignore[reportArgumentType]

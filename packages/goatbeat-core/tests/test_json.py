@@ -23,3 +23,11 @@ def test_rejects_values_that_are_not_json(value: object) -> None:
 
 def test_tuples_become_lists() -> None:
     assert ensure_json((1, 2)) == [1, 2]
+
+
+@pytest.mark.parametrize("value", ["a\x00b", {"k\x00": 1}, ["\x00"]])
+def test_nul_characters_are_rejected_because_postgresql_jsonb_cannot_store_them(
+    value: object,
+) -> None:
+    with pytest.raises(ConfigurationError):
+        ensure_json(value)

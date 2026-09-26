@@ -14,6 +14,10 @@ class TaskCall:
     args: tuple[JsonValue, ...] = ()
     kwargs: Mapping[str, JsonValue] = field(default_factory=dict[str, JsonValue])
 
+    def __post_init__(self) -> None:
+        ensure_json(list(self.args))
+        ensure_json(dict(self.kwargs))
+
 
 def call[**P](task: Callable[P, object], /, *args: P.args, **kwargs: P.kwargs) -> TaskCall:
     return TaskCall(
