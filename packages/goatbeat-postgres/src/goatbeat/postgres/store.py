@@ -10,6 +10,7 @@ from typing import Final, LiteralString
 
 from goatbeat.core.errors import ConfigurationError, LeaseLostError, StoreUnavailableError
 from goatbeat.core.execution import (
+    EARLY_COMPLETION_RETENTION,
     Execution,
     ExecutionStatus,
     Lease,
@@ -82,6 +83,8 @@ _SET_LOCK_TIMEOUT: Final = "SELECT set_config('lock_timeout', %s, true)"
 _SET_IDLE_TIMEOUT: Final = "SELECT set_config('idle_in_transaction_session_timeout', %s, true)"
 # Row locks cannot guard names that do not exist yet: concurrent first starts would both insert.
 _LOCK_SCHEDULE_WRITES: Final = "SELECT pg_advisory_xact_lock(hashtext('goatbeat.schedules'))"
+# A completion and the dispatch record of the same task result must not interleave.
+_LOCK_RESULT: Final = "SELECT pg_advisory_xact_lock(hashtext(%s))"
 _NOTIFY: Final = "SELECT pg_notify('" + CHANNEL + "', '')"
 
 
@@ -214,6 +217,7 @@ class PostgresStore:
     ) -> Sequence[Execution]:
         """Claim inside a transaction the caller owns (Django's ``atomic`` for instance)."""
         self._ensure_fence(cursor, lease)
+        self._lock_schedule(cursor, schedule)
         created: list[Execution] = []
         for claim in plan.claims:
             execution = Execution(
@@ -248,6 +252,7 @@ class PostgresStore:
             claimed_at=now,
         )
         with self._provider.transaction() as cursor:
+            self._lock_schedule(cursor, schedule)
             cursor.execute(_INSERT_EXECUTION, _execution_values(execution))
             cursor.execute(_SELECT_EXECUTION + "WHERE idempotency_key = %s", [key.value])
             row = cursor.fetchone()
@@ -291,18 +296,26 @@ class PostgresStore:
         return pending
 
     def mark_dispatched(self, key: IdempotencyKey, at: Instant, receipt: SubmissionReceipt) -> None:
+        status, completed_at = receipt.status, None if receipt.outcome is None else at.datetime
         with self._provider.transaction() as cursor:
+            if receipt.result_id is not None:
+                cursor.execute(_LOCK_RESULT, [receipt.result_id])
+                cursor.execute(
+                    "DELETE FROM goatbeat_early_completion WHERE result_id = %s "
+                    "RETURNING status, completed_at",
+                    [receipt.result_id],
+                )
+                early = cursor.fetchone()
+                if early is not None:
+                    status, completed_at = (
+                        ExecutionStatus(_text(early[0])),
+                        _instant(early[1]).datetime,
+                    )
             cursor.execute(
                 "UPDATE goatbeat_execution SET status = %s, dispatched_at = %s, "
                 "completed_at = %s, backend_result_id = %s, next_retry_at = NULL, error = NULL "
-                "WHERE idempotency_key = %s",
-                [
-                    receipt.status.value,
-                    at.datetime,
-                    None if receipt.outcome is None else at.datetime,
-                    receipt.result_id,
-                    key.value,
-                ],
+                "WHERE idempotency_key = %s AND status NOT IN ('completed', 'task_failed')",
+                [status.value, at.datetime, completed_at, receipt.result_id, key.value],
             )
 
     def mark_submit_failed(self, key: IdempotencyKey, error: str, retry_at: Instant | None) -> None:
@@ -314,15 +327,30 @@ class PostgresStore:
                 [status.value, None if retry_at is None else retry_at.datetime, error, key.value],
             )
 
-    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
+    def record_completion(
+        self, result_id: str, task_path: str, *, succeeded: bool, at: Instant
+    ) -> bool:
         status = ExecutionStatus.COMPLETED if succeeded else ExecutionStatus.TASK_FAILED
         with self._provider.transaction() as cursor:
+            cursor.execute(_LOCK_RESULT, [result_id])
             cursor.execute(
                 "UPDATE goatbeat_execution SET status = %s, completed_at = %s "
                 "WHERE backend_result_id = %s AND status = %s",
                 [status.value, at.datetime, result_id, ExecutionStatus.DISPATCHED.value],
             )
-            return cursor.rowcount > 0
+            if cursor.rowcount > 0:
+                return True
+            cursor.execute(
+                "DELETE FROM goatbeat_early_completion WHERE completed_at < %s",
+                [(at - EARLY_COMPLETION_RETENTION).datetime],
+            )
+            cursor.execute(
+                "INSERT INTO goatbeat_early_completion (result_id, status, completed_at) "
+                "SELECT %s, %s, %s WHERE EXISTS "
+                "(SELECT 1 FROM goatbeat_schedule WHERE task_path = %s) ON CONFLICT DO NOTHING",
+                [result_id, status.value, at.datetime, task_path],
+            )
+            return False
 
     def next_wakeup(self) -> Instant | None:
         with self._provider.transaction() as cursor:
@@ -368,6 +396,14 @@ class PostgresStore:
         )
         if cursor.fetchone() is None:
             raise LeaseLostError(f"{lease.holder.value} no longer holds token {lease.token.value}")
+
+    def _lock_schedule(self, cursor: Cursor, schedule: Schedule) -> None:
+        """KEY SHARE keeps the schedule from being deleted before the executions commit."""
+        cursor.execute(
+            "SELECT 1 FROM goatbeat_schedule WHERE id = %s FOR KEY SHARE", [schedule.id.value]
+        )
+        if cursor.fetchone() is None:
+            raise ConfigurationError(f"schedule {schedule.name!r} no longer exists")
 
     def _schedule_by_name(self, cursor: Cursor, name: str, *, lock: bool) -> Schedule | None:
         query: LiteralString = _SELECT_SCHEDULE + "WHERE name = %s"

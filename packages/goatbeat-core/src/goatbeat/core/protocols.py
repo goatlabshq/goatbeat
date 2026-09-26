@@ -61,8 +61,14 @@ class ScheduleStore(Protocol):
         self, key: IdempotencyKey, error: str, retry_at: Instant | None
     ) -> None: ...
 
-    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
-        """Finish a dispatched execution by its backend result id; False if none matched."""
+    def record_completion(
+        self, result_id: str, task_path: str, *, succeeded: bool, at: Instant
+    ) -> bool:
+        """Finish a dispatched execution by its backend result id; False if none matched yet.
+
+        A completion arriving before its dispatch is recorded is remembered (for scheduled task
+        paths only) and applied by ``mark_dispatched``.
+        """
         ...
 
     def next_wakeup(self) -> Instant | None: ...

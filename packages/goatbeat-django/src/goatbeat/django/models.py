@@ -58,6 +58,7 @@ class Schedule(models.Model):
                 condition=models.Q(enabled=True),
                 name="goatbeat_schedule_due",
             ),
+            models.Index(fields=["task_path"], name="goatbeat_schedule_task"),
         )
 
     @override
@@ -114,6 +115,15 @@ class Execution(models.Model):
     @override
     def __str__(self) -> str:
         return self.idempotency_key
+
+
+class EarlyCompletion(models.Model):
+    result_id: Text = models.TextField(primary_key=True)
+    status: Text = models.TextField()
+    completed_at: Moment = models.DateTimeField()
+
+    class Meta:
+        db_table = "goatbeat_early_completion"
 
 
 class Lease(models.Model):

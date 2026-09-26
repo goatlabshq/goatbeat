@@ -24,6 +24,7 @@ MINUTE: Final = timedelta(minutes=1)
 ALICE: Final = SchedulerId("alice")
 BOB: Final = SchedulerId("bob")
 REQUESTER: Final = SchedulerId("admin:alice")
+TASK_PATH: Final = "tasks.run"
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +34,7 @@ class StoreUnderTest:
     clock: FakeClock
 
 
-def every_minute(name: str, clock: FakeClock, *, task: str = "tasks.run") -> ScheduleDefinition:
+def every_minute(name: str, clock: FakeClock, *, task: str = TASK_PATH) -> ScheduleDefinition:
     return ScheduleDefinition(
         name=name, task=TaskCall(task), trigger=IntervalTrigger(MINUTE, clock.now())
     )
@@ -333,15 +334,51 @@ class StoreConformance(ABC):
         now = sut.clock.advance(MINUTE)
         lease = self._leader(sut)
         [execution] = sut.store.claim(lease, schedule, one_claim(schedule), now)
-        assert not sut.store.record_completion("r-1", succeeded=True, at=now)
         sut.store.mark_dispatched(execution.idempotency_key, now, SubmissionReceipt("r-1"))
         done = sut.clock.advance(MINUTE)
-        assert sut.store.record_completion("r-1", succeeded=True, at=done)
-        assert not sut.store.record_completion("r-1", succeeded=False, at=done)
-        assert not sut.store.record_completion("unknown", succeeded=True, at=done)
+        assert sut.store.record_completion("r-1", TASK_PATH, succeeded=True, at=done)
+        assert not sut.store.record_completion("r-1", TASK_PATH, succeeded=False, at=done)
         [stored] = sut.store.recent_executions(schedule.id, limit=1)
         assert stored.status is ExecutionStatus.COMPLETED
         assert stored.completed_at == done
+
+    def test_a_completion_arriving_before_the_dispatch_is_applied_by_it(self) -> None:
+        sut = self._setup()
+        schedule = self._saved(sut)
+        now = sut.clock.advance(MINUTE)
+        lease = self._leader(sut)
+        [execution] = sut.store.claim(lease, schedule, one_claim(schedule), now)
+        finished = sut.clock.advance(timedelta(seconds=1))
+        assert not sut.store.record_completion("r-1", TASK_PATH, succeeded=False, at=finished)
+        sut.store.mark_dispatched(execution.idempotency_key, now, SubmissionReceipt("r-1"))
+        [stored] = sut.store.recent_executions(schedule.id, limit=1)
+        assert stored.status is ExecutionStatus.TASK_FAILED
+        assert stored.completed_at == finished
+
+    def test_completions_of_unscheduled_tasks_are_not_remembered(self) -> None:
+        sut = self._setup()
+        schedule = self._saved(sut)
+        now = sut.clock.advance(MINUTE)
+        lease = self._leader(sut)
+        [execution] = sut.store.claim(lease, schedule, one_claim(schedule), now)
+        assert not sut.store.record_completion("r-1", "app.other", succeeded=True, at=now)
+        sut.store.mark_dispatched(execution.idempotency_key, now, SubmissionReceipt("r-1"))
+        [stored] = sut.store.recent_executions(schedule.id, limit=1)
+        assert stored.status is ExecutionStatus.DISPATCHED
+
+    def test_a_finished_execution_is_never_set_back_to_dispatched(self) -> None:
+        sut = self._setup()
+        schedule = self._saved(sut)
+        now = sut.clock.advance(MINUTE)
+        lease = self._leader(sut)
+        [execution] = sut.store.claim(lease, schedule, one_claim(schedule), now)
+        key = execution.idempotency_key
+        sut.store.mark_dispatched(key, now, SubmissionReceipt("r-1"))
+        sut.store.record_completion("r-1", TASK_PATH, succeeded=True, at=now)
+        sut.store.mark_dispatched(key, sut.clock.advance(MINUTE), SubmissionReceipt("r-2"))
+        [stored] = sut.store.recent_executions(schedule.id, limit=1)
+        assert stored.status is ExecutionStatus.COMPLETED
+        assert stored.backend_result_id == "r-1"
 
     # Submissions
 

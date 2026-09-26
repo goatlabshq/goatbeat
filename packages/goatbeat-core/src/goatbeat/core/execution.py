@@ -1,8 +1,9 @@
 """Execution history types shared by stores, submitters and the scheduler."""
 
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import StrEnum
-from typing import Literal
+from typing import Final, Literal
 
 from goatbeat.core.ids import FencingToken, IdempotencyKey, ScheduleId, SchedulerId
 from goatbeat.core.time import Instant
@@ -17,6 +18,11 @@ class ExecutionStatus(StrEnum):
     SKIPPED = "skipped"
     COMPLETED = "completed"
     TASK_FAILED = "task_failed"
+
+
+FINISHED_STATUSES: Final = frozenset({ExecutionStatus.COMPLETED, ExecutionStatus.TASK_FAILED})
+# How long a completion that beat its dispatch record waits for it before being dropped.
+EARLY_COMPLETION_RETENTION: Final = timedelta(days=1)
 
 
 @dataclass(frozen=True, slots=True)

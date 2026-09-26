@@ -7,6 +7,8 @@ from datetime import timedelta
 
 from goatbeat.core.errors import ConfigurationError, LeaseLostError
 from goatbeat.core.execution import (
+    EARLY_COMPLETION_RETENTION,
+    FINISHED_STATUSES,
     Execution,
     ExecutionStatus,
     Lease,
@@ -38,6 +40,7 @@ class MemoryStore:
         self._lease = _LeaseRow()
         self._schedules: dict[str, Schedule] = {}
         self._executions: dict[IdempotencyKey, Execution] = {}
+        self._early: dict[str, tuple[ExecutionStatus, Instant]] = {}
 
     # LeaseManager
 
@@ -175,11 +178,17 @@ class MemoryStore:
     def mark_dispatched(self, key: IdempotencyKey, at: Instant, receipt: SubmissionReceipt) -> None:
         with self._changed:
             execution = self._executions[key]
+            if execution.status in FINISHED_STATUSES:
+                return
+            status, completed_at = receipt.status, None if receipt.outcome is None else at
+            early = self._early.pop(receipt.result_id, None) if receipt.result_id else None
+            if early is not None:
+                status, completed_at = early
             self._executions[key] = replace(
                 execution,
-                status=receipt.status,
+                status=status,
                 dispatched_at=at,
-                completed_at=None if receipt.outcome is None else at,
+                completed_at=completed_at,
                 backend_result_id=receipt.result_id,
                 next_retry_at=None,
                 error=None,
@@ -199,17 +208,26 @@ class MemoryStore:
             )
             self._changed.notify_all()
 
-    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
+    def record_completion(
+        self, result_id: str, task_path: str, *, succeeded: bool, at: Instant
+    ) -> bool:
         with self._changed:
+            status = _finished(succeeded=succeeded)
             for key, execution in self._executions.items():
                 if (
                     execution.backend_result_id == result_id
                     and execution.status is ExecutionStatus.DISPATCHED
                 ):
-                    self._executions[key] = replace(
-                        execution, status=_finished(succeeded=succeeded), completed_at=at
-                    )
+                    self._executions[key] = replace(execution, status=status, completed_at=at)
                     return True
+            scheduled = any(s.definition.task.path == task_path for s in self._schedules.values())
+            if scheduled:
+                self._early = {
+                    rid: early
+                    for rid, early in self._early.items()
+                    if at - early[1] < EARLY_COMPLETION_RETENTION
+                }
+                self._early.setdefault(result_id, (status, at))
             return False
 
     def next_wakeup(self) -> Instant | None:

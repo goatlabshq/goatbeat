@@ -11,9 +11,14 @@ from goatbeat.postgres.provider import PsycopgProvider
 from goatbeat.postgres.schema import migrate
 from goatbeat.postgres.testing import database_url_from_env, isolated_schema
 
-TABLES = ("goatbeat_schedule", "goatbeat_execution", "goatbeat_lease")
+TABLES = (
+    "goatbeat_schedule",
+    "goatbeat_execution",
+    "goatbeat_early_completion",
+    "goatbeat_lease",
+)
 COLUMNS_QUERY = (
-    "SELECT table_name, column_name, data_type, is_nullable, column_default IS NOT NULL, "
+    "SELECT table_name, column_name, data_type, is_nullable, column_default, "
     "is_identity FROM information_schema.columns WHERE table_schema = current_schema() "
     "AND table_name = ANY(%s) ORDER BY table_name, column_name"
 )
@@ -22,7 +27,8 @@ INDEXES_QUERY = (
     "AND tablename = ANY(%s) ORDER BY indexname"
 )
 FOREIGN_KEYS_QUERY = (
-    "SELECT cl.relname, a.attname, ref.relname, c.confdeltype FROM pg_constraint c "
+    "SELECT cl.relname, a.attname, ref.relname, c.confdeltype, c.condeferrable, c.condeferred "
+    "FROM pg_constraint c "
     "JOIN pg_class cl ON cl.oid = c.conrelid JOIN pg_class ref ON ref.oid = c.confrelid "
     "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) "
     "JOIN pg_namespace n ON n.oid = cl.relnamespace "

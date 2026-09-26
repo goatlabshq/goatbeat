@@ -118,3 +118,15 @@ def test_a_task_finishing_later_completes_its_execution(dummy: DummyBackend) -> 
     [stored] = store.recent_executions(schedule.id, limit=1)
     assert stored.status is ExecutionStatus.COMPLETED
     assert stored.completed_at is not None
+
+
+def test_bookkeeping_errors_never_fail_an_enqueue(caplog: pytest.LogCaptureFixture) -> None:
+    with connection.cursor() as cursor:
+        cursor.execute("ALTER TABLE goatbeat_execution RENAME TO goatbeat_execution_hidden")
+    try:
+        tasks.send_report.enqueue()
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE goatbeat_execution_hidden RENAME TO goatbeat_execution")
+    assert tasks.RUNS == ["report"]
+    assert "store.unavailable" in caplog.text

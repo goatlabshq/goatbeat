@@ -15,6 +15,8 @@ from typing import Final
 
 from goatbeat.core.errors import ConfigurationError, LeaseLostError
 from goatbeat.core.execution import (
+    EARLY_COMPLETION_RETENTION,
+    FINISHED_STATUSES,
     Execution,
     ExecutionStatus,
     Lease,
@@ -90,6 +92,12 @@ CREATE INDEX IF NOT EXISTS goatbeat_execution_result
     ON goatbeat_execution (backend_result_id) WHERE backend_result_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS goatbeat_execution_pending
     ON goatbeat_execution (status, next_retry_at_us, claimed_at_us);
+CREATE TABLE IF NOT EXISTS goatbeat_early_completion (
+    result_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    completed_at_us INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS goatbeat_schedule_task ON goatbeat_schedule (task_path);
 CREATE TABLE IF NOT EXISTS goatbeat_lease (
     partition INTEGER PRIMARY KEY,
     holder_id TEXT,
@@ -333,17 +341,27 @@ class SQLiteStore:
         return [PendingSubmission(_execution(row), _schedule(row, offset=split)) for row in rows]
 
     def mark_dispatched(self, key: IdempotencyKey, at: Instant, receipt: SubmissionReceipt) -> None:
+        status, completed_at = receipt.status, None if receipt.outcome is None else at
         with self._write() as cursor:
+            early = cursor.execute(
+                "DELETE FROM goatbeat_early_completion WHERE result_id = ? "
+                "RETURNING status, completed_at_us",
+                (receipt.result_id,),
+            ).fetchone()
+            completed_at_us = None if completed_at is None else completed_at.timestamp_us
+            if early is not None:
+                status, completed_at_us = ExecutionStatus(early[0]), early[1]
             cursor.execute(
                 "UPDATE goatbeat_execution SET status = ?, dispatched_at_us = ?, "
                 "completed_at_us = ?, backend_result_id = ?, next_retry_at_us = NULL, "
-                "error = NULL WHERE idempotency_key = ?",
+                "error = NULL WHERE idempotency_key = ? AND status NOT IN (?, ?)",
                 (
-                    receipt.status.value,
+                    status.value,
                     at.timestamp_us,
-                    None if receipt.outcome is None else at.timestamp_us,
+                    completed_at_us,
                     receipt.result_id,
                     key.value,
+                    *(finished.value for finished in sorted(FINISHED_STATUSES)),
                 ),
             )
 
@@ -362,7 +380,9 @@ class SQLiteStore:
             )
         self._notify()
 
-    def record_completion(self, result_id: str, *, succeeded: bool, at: Instant) -> bool:
+    def record_completion(
+        self, result_id: str, task_path: str, *, succeeded: bool, at: Instant
+    ) -> bool:
         status = ExecutionStatus.COMPLETED if succeeded else ExecutionStatus.TASK_FAILED
         with self._write() as cursor:
             cursor.execute(
@@ -370,7 +390,19 @@ class SQLiteStore:
                 "WHERE backend_result_id = ? AND status = ?",
                 (status.value, at.timestamp_us, result_id, ExecutionStatus.DISPATCHED.value),
             )
-            return cursor.rowcount > 0
+            if cursor.rowcount > 0:
+                return True
+            cursor.execute(
+                "DELETE FROM goatbeat_early_completion WHERE completed_at_us < ?",
+                ((at - EARLY_COMPLETION_RETENTION).timestamp_us,),
+            )
+            cursor.execute(
+                "INSERT INTO goatbeat_early_completion (result_id, status, completed_at_us) "
+                "SELECT ?, ?, ? WHERE EXISTS "
+                "(SELECT 1 FROM goatbeat_schedule WHERE task_path = ?) ON CONFLICT DO NOTHING",
+                (result_id, status.value, at.timestamp_us, task_path),
+            )
+            return False
 
     def next_wakeup(self) -> Instant | None:
         rows = self._read(

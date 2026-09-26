@@ -6,6 +6,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from django.db import DatabaseError
 from django.tasks import TaskResultStatus
 
 from goatbeat.core.errors import StoreUnavailableError
@@ -28,13 +29,14 @@ def record_task_completion(
     if task_result.status not in (TaskResultStatus.SUCCESSFUL, TaskResultStatus.FAILED):
         return
     finished = task_result.finished_at or datetime.now(UTC)
-    store = PostgresStore(DjangoProvider(DjangoSettings.from_django().database))
     try:
+        store = PostgresStore(DjangoProvider(DjangoSettings.from_django().database))
         store.record_completion(
             task_result.id,
+            task_result.task.module_path,
             succeeded=task_result.status == TaskResultStatus.SUCCESSFUL,
             at=Instant.of(finished),
         )
-    except StoreUnavailableError as error:
+    except (StoreUnavailableError, DatabaseError) as error:
         # Bookkeeping must never fail the task itself: the execution just stays "dispatched".
         log_event(logger, Event.STORE_UNAVAILABLE, logging.WARNING, error=str(error))
