@@ -367,9 +367,10 @@ error, 4 store unavailable.
 - ruff (same rule set as goatseo), pyright strict, pytest with `filterwarnings = error`.
 - lefthook: ruff on pre-commit, pyright and pytest on pre-push, conventional commit-msg check.
 - Workflows: `ci.yml` (matrix Python 3.13 and 3.14, PostgreSQL 16 and 17 services),
-  `security.yml` (CodeQL), `release.yml` (reusable, called by release-please),
+  `security.yml` (Semgrep, Gitleaks, OSV-Scanner, zizmor), `release.yml` (reusable, called by release-please),
   `release-please.yml`. Config in `release/config.json` and `release/.manifest.json`.
-- Dependabot, actionlint, actions pinned by commit hash.
+- Dependabot, actionlint, actions pinned by commit hash. No CodeQL: it needs GitHub Code
+  Security on private repositories.
 - `docker-compose.yml`: PostgreSQL, three schedulers, two Django Tasks workers.
 
 ## 15. Documentation
