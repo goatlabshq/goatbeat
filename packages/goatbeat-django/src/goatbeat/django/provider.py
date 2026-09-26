@@ -23,8 +23,9 @@ class DjangoProvider:
     @contextmanager
     def transaction(self) -> Generator[Cursor]:
         connection = connections[self._alias]
-        # A long-running scheduler thread must not keep reusing a connection the server dropped.
-        connection.close_if_unusable_or_obsolete()
+        if not connection.in_atomic_block:
+            # What Django does between requests: the scheduler thread never gets that hook.
+            connection.close_if_unusable_or_obsolete()
         try:
             with transaction.atomic(using=self._alias), connection.cursor() as cursor:
                 yield cast("Cursor", cursor)
