@@ -2,6 +2,7 @@
 
 from typing import Final, LiteralString
 
+from goatbeat.core.errors import ConfigurationError
 from goatbeat.postgres.provider import ConnectionProvider
 
 # Transaction-scoped, so it also works behind PgBouncer in transaction pooling mode.
@@ -102,6 +103,11 @@ def migrate(provider: ConnectionProvider) -> int:
         cursor.execute("SELECT COALESCE(MAX(version), 0) FROM goatbeat_schema_version")
         row = cursor.fetchone()
         current = int(str(row[0])) if row is not None else 0
+        if current > SCHEMA_VERSION:
+            raise ConfigurationError(
+                f"the database schema is at version {current} but this release only knows "
+                f"{SCHEMA_VERSION}: upgrade goatbeat-postgres before running it"
+            )
         for version, statements in enumerate(MIGRATIONS[current:], start=current + 1):
             for statement in statements:
                 cursor.execute(statement)

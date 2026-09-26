@@ -2,7 +2,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from goatbeat.core.errors import StoreUnavailableError
+from goatbeat.core.errors import ConfigurationError, StoreUnavailableError
 from goatbeat.postgres.provider import PsycopgProvider
 from goatbeat.postgres.schema import SCHEMA_VERSION, migrate
 
@@ -65,3 +65,12 @@ def test_a_read_only_database_is_reported_as_unavailable(conninfo: str) -> None:
         provider.transaction() as cursor,
     ):
         cursor.execute("UPDATE goatbeat_lease SET holder_id = NULL")
+
+
+def test_an_older_release_refuses_a_newer_schema(conninfo: str) -> None:
+    with PsycopgProvider.connect(conninfo) as provider:
+        migrate(provider)
+        with provider.transaction() as cursor:
+            cursor.execute("INSERT INTO goatbeat_schema_version (version) VALUES (99)")
+        with pytest.raises(ConfigurationError, match="99"):
+            migrate(provider)
