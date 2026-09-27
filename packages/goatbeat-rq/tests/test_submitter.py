@@ -47,12 +47,12 @@ def test_the_job_id_is_derived_from_the_idempotency_key(redis: Redis) -> None:
     assert (arguments, job.kwargs) == ((42,), {"subject": "hi"})
 
 
-def test_resubmitting_keeps_one_job(redis: Redis) -> None:
+def test_resubmitting_reuses_the_job_id(redis: Redis) -> None:
     submitter = RQSubmitter(redis)
     submitter.submit(submission())
     submitter.submit(submission())
-    assert Queue("default", connection=redis).job_ids.count(job_id_for(KEY)) >= 1
-    assert len(set(Queue("default", connection=redis).job_ids)) == 1
+    # RQ does not deduplicate: the id is queued twice and would run twice (at least once).
+    assert set(Queue("default", connection=redis).job_ids) == {job_id_for(KEY)}
 
 
 @pytest.mark.parametrize("routing", [Routing(priority=1), Routing(backend="other")])
