@@ -13,6 +13,11 @@ The design lives in `docs/superpowers/specs/2026-09-25-goatbeat-design.md`.
 - `packages/goatbeat-django`: Django app `goatbeat.django` (label `goatbeat`). It reuses
   `PostgresStore` through `DjangoProvider`; its migrations must keep matching
   `goatbeat.postgres.schema` (`tests/test_schema_equivalence.py`). Admin writes go through the store.
+- `packages/goatbeat-{celery,dramatiq,rq}`: one `TaskSubmitter` each; libraries whose types are
+  incomplete are reached through narrow private protocols.
+- `packages/goatbeat-{prometheus,otel}`: `MetricsSink` implementations.
+- `packages/goatbeat-cli`: the `goatbeat` command. It imports backends lazily so optional
+  packages stay optional; exit codes 0/1/2/3/4 are part of its contract.
 - `packages/goatbeat`: facade distribution. It alone owns `goatbeat/__init__.py`; every other
   package is a namespace portion (`goatbeat/core/`, ...). `pkgutil.extend_path` in that file makes
   editable installs work at runtime.

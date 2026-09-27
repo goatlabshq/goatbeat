@@ -104,6 +104,35 @@ Occurrences are enqueued with Django Tasks; `task_finished` marks them `complete
 The admin lists schedules, their executions and offers enable, disable and run-now actions.
 Give the scheduler process persistent connections (`CONN_MAX_AGE`, `CONN_HEALTH_CHECKS`).
 
+## Command line
+
+```python
+# myproject/beat.py
+from celery import Celery
+
+from goatbeat import GoatbeatApp, Registry
+from goatbeat.celery import CelerySubmitter
+
+beat = Registry()
+beat.schedule(name="daily-report", task=generate_report, cron="0 9 * * *")
+app = GoatbeatApp(registry=beat, submitter=CelerySubmitter(Celery(broker="redis://...")))
+```
+
+```bash
+export GOATBEAT_DATABASE_URL=postgresql://goatbeat@db/goatbeat   # or sqlite:///beat.db
+goatbeat --app myproject.beat:app migrate
+goatbeat --app myproject.beat:app scheduler --metrics-port 9464
+goatbeat --app myproject.beat:app status --json
+goatbeat --app myproject.beat:app doctor        # exit 1 when a check fails
+```
+
+Exit codes: 0 success, 1 check failed, 2 usage error, 3 configuration error, 4 store
+unavailable. With `DJANGO_SETTINGS_MODULE` set and no `--app`, the command uses the Django
+project. Submitters: `goatbeat.celery.CelerySubmitter`, `goatbeat.dramatiq.DramatiqSubmitter`,
+`goatbeat.rq.RQSubmitter` and `goatbeat.django.submitter.DjangoTasksSubmitter`; each passes the
+idempotency key as the message id. Metrics: `goatbeat.prometheus.PrometheusMetrics` and
+`goatbeat.otel.OpenTelemetryMetrics` (`GoatbeatApp(metrics=...)`).
+
 ## Guarantees
 
 - Scheduling: each occurrence is claimed at most once (unique constraint plus fenced lease).

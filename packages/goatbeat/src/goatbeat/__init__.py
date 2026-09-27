@@ -6,6 +6,7 @@ from pkgutil import extend_path
 # lets goatbeat.core, goatbeat.postgres, ... resolve as portions of this regular package.
 __path__ = extend_path(__path__, __name__)
 
+from goatbeat.core.app import GoatbeatApp
 from goatbeat.core.config import GoatbeatConfig
 from goatbeat.core.errors import (
     ConfigurationError,
@@ -30,6 +31,7 @@ __all__ = [
     "CallableSubmitter",
     "ConfigurationError",
     "ExecutionStatus",
+    "GoatbeatApp",
     "GoatbeatConfig",
     "GoatbeatError",
     "InvalidCronExpressionError",

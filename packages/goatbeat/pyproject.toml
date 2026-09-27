@@ -19,11 +19,17 @@ classifiers = [
 ]
 dependencies = [
     "goatbeat-core==0.1.0", # x-release-please-version
+    "goatbeat-cli==0.1.0", # x-release-please-version
 ]
 
 [project.optional-dependencies]
 postgres = ["goatbeat-postgres==0.1.0"] # x-release-please-version
 django = ["goatbeat-django==0.1.0"] # x-release-please-version
+celery = ["goatbeat-celery==0.1.0"] # x-release-please-version
+dramatiq = ["goatbeat-dramatiq==0.1.0"] # x-release-please-version
+rq = ["goatbeat-rq==0.1.0"] # x-release-please-version
+prometheus = ["goatbeat-prometheus==0.1.0"] # x-release-please-version
+otel = ["goatbeat-otel==0.1.0"] # x-release-please-version
 
 [project.urls]
 Homepage = "https://github.com/midsonlajeanty/goatbeat"
@@ -40,3 +46,9 @@ module-name = "goatbeat"
 goatbeat-core = { workspace = true }
 goatbeat-postgres = { workspace = true }
 goatbeat-django = { workspace = true }
+goatbeat-cli = { workspace = true }
+goatbeat-celery = { workspace = true }
+goatbeat-dramatiq = { workspace = true }
+goatbeat-rq = { workspace = true }
+goatbeat-prometheus = { workspace = true }
+goatbeat-otel = { workspace = true }

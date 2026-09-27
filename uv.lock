@@ -425,24 +425,46 @@ name = "goatbeat"
 version = "0.1.0"
 source = { editable = "packages/goatbeat" }
 dependencies = [
+    { name = "goatbeat-cli" },
     { name = "goatbeat-core" },
 ]
 
 [package.optional-dependencies]
+celery = [
+    { name = "goatbeat-celery" },
+]
 django = [
     { name = "goatbeat-django" },
+]
+dramatiq = [
+    { name = "goatbeat-dramatiq" },
+]
+otel = [
+    { name = "goatbeat-otel" },
 ]
 postgres = [
     { name = "goatbeat-postgres" },
 ]
+prometheus = [
+    { name = "goatbeat-prometheus" },
+]
+rq = [
+    { name = "goatbeat-rq" },
+]
 
 [package.metadata]
 requires-dist = [
+    { name = "goatbeat-celery", marker = "extra == 'celery'", editable = "packages/goatbeat-celery" },
+    { name = "goatbeat-cli", editable = "packages/goatbeat-cli" },
     { name = "goatbeat-core", editable = "packages/goatbeat-core" },
     { name = "goatbeat-django", marker = "extra == 'django'", editable = "packages/goatbeat-django" },
+    { name = "goatbeat-dramatiq", marker = "extra == 'dramatiq'", editable = "packages/goatbeat-dramatiq" },
+    { name = "goatbeat-otel", marker = "extra == 'otel'", editable = "packages/goatbeat-otel" },
     { name = "goatbeat-postgres", marker = "extra == 'postgres'", editable = "packages/goatbeat-postgres" },
+    { name = "goatbeat-prometheus", marker = "extra == 'prometheus'", editable = "packages/goatbeat-prometheus" },
+    { name = "goatbeat-rq", marker = "extra == 'rq'", editable = "packages/goatbeat-rq" },
 ]
-provides-extras = ["postgres", "django"]
+provides-extras = ["postgres", "django", "celery", "dramatiq", "rq", "prometheus", "otel"]
 
 [[package]]
 name = "goatbeat-celery"
