@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from goatbeat.core.errors import ConfigurationError, TaskNotFoundError
 from goatbeat.core.json import JsonValue, ensure_json
 
+_MISSING = object()
+
 
 @dataclass(frozen=True, slots=True)
 class TaskCall:
@@ -39,19 +41,29 @@ def task_path(task: object) -> str:
     return f"{module}.{qualname}"
 
 
-def import_task(path: str) -> Callable[..., object]:
+def import_object(path: str) -> object:
+    """Import ``package.module.attribute.nested`` by trying the longest module prefix first."""
     parts = path.split(".")
     for split in range(len(parts) - 1, 0, -1):
         module_name = ".".join(parts[:split])
         try:
             target: object = importlib.import_module(module_name)
         except ModuleNotFoundError as error:
-            if error.name is not None and module_name.startswith(error.name):
+            if error.name is not None and (
+                module_name == error.name or module_name.startswith(f"{error.name}.")
+            ):
                 continue
             raise
         for attribute in parts[split:]:
-            target = getattr(target, attribute, None)
-        if callable(target):
-            return target
-        break
-    raise TaskNotFoundError(f"no callable task at {path!r}")
+            target = getattr(target, attribute, _MISSING)
+            if target is _MISSING:
+                raise TaskNotFoundError(f"nothing importable at {path!r}")
+        return target
+    raise TaskNotFoundError(f"nothing importable at {path!r}")
+
+
+def import_task(path: str) -> Callable[..., object]:
+    target = import_object(path)
+    if not callable(target):
+        raise TaskNotFoundError(f"no callable task at {path!r}")
+    return target
