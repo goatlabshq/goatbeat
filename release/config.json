@@ -12,7 +12,13 @@
         "packages/goatbeat/pyproject.toml",
         "packages/goatbeat-core/pyproject.toml",
         "packages/goatbeat-postgres/pyproject.toml",
-        "packages/goatbeat-django/pyproject.toml"
+        "packages/goatbeat-django/pyproject.toml",
+        "packages/goatbeat-celery/pyproject.toml",
+        "packages/goatbeat-dramatiq/pyproject.toml",
+        "packages/goatbeat-rq/pyproject.toml",
+        "packages/goatbeat-prometheus/pyproject.toml",
+        "packages/goatbeat-otel/pyproject.toml",
+        "packages/goatbeat-cli/pyproject.toml"
       ]
     }
   }

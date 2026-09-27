@@ -14,6 +14,15 @@ dev = [
     "goatbeat-core",
     "goatbeat-postgres",
     "goatbeat-django",
+    "goatbeat-celery",
+    "goatbeat-dramatiq",
+    "goatbeat-rq",
+    "goatbeat-prometheus",
+    "goatbeat-otel",
+    "goatbeat-cli",
+    "celery-types>=0.26",
+    "fakeredis>=2.30",
+    "opentelemetry-sdk>=1.30",
     "croniter>=6.0",
     "django-stubs>=6.1",
     "hypothesis>=6.140",
@@ -39,6 +48,12 @@ goatbeat = { workspace = true }
 goatbeat-core = { workspace = true }
 goatbeat-postgres = { workspace = true }
 goatbeat-django = { workspace = true }
+goatbeat-celery = { workspace = true }
+goatbeat-dramatiq = { workspace = true }
+goatbeat-rq = { workspace = true }
+goatbeat-prometheus = { workspace = true }
+goatbeat-otel = { workspace = true }
+goatbeat-cli = { workspace = true }
 
 [tool.ruff]
 target-version = "py313"
