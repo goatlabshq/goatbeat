@@ -1,8 +1,10 @@
 """Versioned DDL. Django creates the same tables through its migrations (tested for equality)."""
 
+from datetime import datetime
 from typing import Final, LiteralString
 
-from goatbeat.core.errors import ConfigurationError
+from goatbeat.core.errors import ConfigurationError, StoreUnavailableError
+from goatbeat.core.time import Instant
 from goatbeat.postgres.provider import ConnectionProvider
 
 # Transaction-scoped, so it also works behind PgBouncer in transaction pooling mode.
@@ -126,3 +128,25 @@ def migrate(provider: ConnectionProvider) -> int:
                 cursor.execute(statement)
             cursor.execute("INSERT INTO goatbeat_schema_version (version) VALUES (%s)", [version])
     return SCHEMA_VERSION
+
+
+def applied_version(provider: ConnectionProvider) -> int:
+    """The schema version recorded in the database; 0 before the first migration."""
+    with provider.transaction() as cursor:
+        cursor.execute("SELECT to_regclass('goatbeat_schema_version') IS NOT NULL")
+        exists = cursor.fetchone()
+        if exists is None or not exists[0]:
+            return 0
+        cursor.execute("SELECT COALESCE(MAX(version), 0) FROM goatbeat_schema_version")
+        row = cursor.fetchone()
+    return int(str(row[0])) if row is not None else 0
+
+
+def database_clock(provider: ConnectionProvider) -> Instant:
+    """PostgreSQL's clock, which decides lease expiry; compared to local clocks by doctor."""
+    with provider.transaction() as cursor:
+        cursor.execute("SELECT clock_timestamp()")
+        row = cursor.fetchone()
+    if row is None or not isinstance(row[0], datetime):
+        raise StoreUnavailableError("the database returned no clock reading")
+    return Instant.of(row[0])

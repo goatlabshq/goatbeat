@@ -3,8 +3,9 @@ import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from goatbeat.core.errors import ConfigurationError, StoreUnavailableError
+from goatbeat.core.time import SystemClock
 from goatbeat.postgres.provider import PsycopgProvider
-from goatbeat.postgres.schema import SCHEMA_VERSION, migrate
+from goatbeat.postgres.schema import SCHEMA_VERSION, applied_version, database_clock, migrate
 
 
 def tables(conninfo: str) -> set[str]:
@@ -74,3 +75,12 @@ def test_an_older_release_refuses_a_newer_schema(conninfo: str) -> None:
             cursor.execute("INSERT INTO goatbeat_schema_version (version) VALUES (99)")
         with pytest.raises(ConfigurationError, match="99"):
             migrate(provider)
+
+
+def test_the_applied_version_and_the_database_clock_are_readable(conninfo: str) -> None:
+    with PsycopgProvider.connect(conninfo) as provider:
+        assert applied_version(provider) == 0
+        migrate(provider)
+        assert applied_version(provider) == SCHEMA_VERSION
+        drift = database_clock(provider) - SystemClock().now()
+        assert abs(drift.total_seconds()) < 5
