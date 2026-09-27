@@ -4,7 +4,13 @@ import logging
 import pytest
 
 from goatbeat.core.execution import ExecutionStatus
-from goatbeat.core.observability import Event, JsonFormatter, NoopMetrics, log_event
+from goatbeat.core.observability import (
+    Event,
+    FanoutMetrics,
+    JsonFormatter,
+    NoopMetrics,
+    log_event,
+)
 
 
 def test_log_event_uses_the_event_name_and_structured_fields(
@@ -53,3 +59,14 @@ def test_noop_metrics_accept_every_call() -> None:
     metrics.occurrences(ExecutionStatus.DISPATCHED, 2)
     metrics.dispatch_latency(0.5)
     metrics.tick_duration(0.01)
+
+
+def test_fanout_metrics_forward_every_call() -> None:
+    calls: list[str] = []
+
+    class Recording(NoopMetrics):
+        def occurrences(self, status: ExecutionStatus, count: int = 1) -> None:
+            calls.append(f"{status.value}:{count}")
+
+    FanoutMetrics(Recording(), Recording()).occurrences(ExecutionStatus.SKIPPED, 3)
+    assert calls == ["skipped:3", "skipped:3"]

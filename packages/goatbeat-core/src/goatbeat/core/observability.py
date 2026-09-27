@@ -89,3 +89,30 @@ class NoopMetrics:
 
     def tick_duration(self, seconds: float) -> None:
         pass
+
+
+class FanoutMetrics:
+    """Sends every call to several sinks, for example Prometheus and OpenTelemetry together."""
+
+    def __init__(self, *sinks: MetricsSink) -> None:
+        self.sinks = sinks
+
+    def leadership(self, *, is_leader: bool) -> None:
+        for sink in self.sinks:
+            sink.leadership(is_leader=is_leader)
+
+    def failover(self) -> None:
+        for sink in self.sinks:
+            sink.failover()
+
+    def occurrences(self, status: ExecutionStatus, count: int = 1) -> None:
+        for sink in self.sinks:
+            sink.occurrences(status, count)
+
+    def dispatch_latency(self, seconds: float) -> None:
+        for sink in self.sinks:
+            sink.dispatch_latency(seconds)
+
+    def tick_duration(self, seconds: float) -> None:
+        for sink in self.sinks:
+            sink.tick_duration(seconds)

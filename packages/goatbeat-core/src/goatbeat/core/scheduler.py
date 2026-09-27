@@ -113,6 +113,10 @@ class Scheduler:
                 self._logger, Event.SCHEDULER_STOPPED, scheduler_id=self._config.scheduler_id.value
             )
 
+    def release(self) -> None:
+        """Give the lease up now, so a standby does not wait for it to expire."""
+        self._keeper.release()
+
     def run_now(self, name: str) -> Execution:
         """Request an extra run; whichever instance leads dispatches it on its next tick."""
         schedule = self._store.get_schedule(name)
