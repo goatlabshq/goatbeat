@@ -1,0 +1,39 @@
+[project]
+name = "goatbeat-cli"
+version = "0.1.0" # x-release-please-version
+description = "The goatbeat command line."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Louis Midson LAJEANTY", email = "midsonlajeanty@proton.me" }]
+requires-python = ">=3.13"
+keywords = ["scheduler", "cron", "periodic-tasks", "distributed", "django-tasks", "leader-election"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Distributed Computing",
+    "Typing :: Typed",
+]
+dependencies = [
+    "goatbeat-core==0.1.0", # x-release-please-version
+]
+
+[project.scripts]
+goatbeat = "goatbeat.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/midsonlajeanty/goatbeat"
+Issues = "https://github.com/midsonlajeanty/goatbeat/issues"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "goatbeat.cli"
+
+[tool.uv.sources]
+goatbeat-core = { workspace = true }

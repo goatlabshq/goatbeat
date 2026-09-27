@@ -6,6 +6,7 @@ from django.core.management import CommandError, call_command
 from django.db import connection
 from sampleapp import tasks
 
+from goatbeat.cli.main import main
 from goatbeat.core.execution import ExecutionStatus
 from goatbeat.core.schedule import ScheduleSource
 from goatbeat.core.tasks import TaskCall
@@ -77,3 +78,16 @@ def test_prune_disables_code_schedules_no_longer_declared() -> None:
     assert not pruned.definition.enabled
     assert pruned.definition.task == TaskCall("sampleapp.tasks.send_report")
     assert store().get_schedule("ping") is not None
+
+
+def test_the_standalone_cli_uses_the_django_project(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "configured-by-the-test-harness")
+    monkeypatch.delenv("GOATBEAT_APP", raising=False)
+    assert main(["schedule", "list", "--json"]) == 0
+    names = [item["name"] for item in json.loads(capsys.readouterr().out)]
+    assert names == ["daily-report", "ping"]
+    assert main(["doctor", "--json"]) == 0
+    checks = {check["name"]: check["ok"] for check in json.loads(capsys.readouterr().out)}
+    assert checks == {"store": True, "tasks": True}

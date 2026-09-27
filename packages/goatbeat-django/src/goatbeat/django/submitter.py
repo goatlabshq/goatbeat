@@ -43,6 +43,14 @@ class DjangoTasksSubmitter:
         return SubmissionReceipt(result.id, outcome=_OUTCOMES.get(result.status))
 
 
+def is_django_task(path: str) -> bool:
+    try:
+        _resolve(path)
+    except SubmissionError:
+        return False
+    return True
+
+
 def _resolve(path: str) -> Task[..., object]:
     try:
         target: object = import_string(path)
