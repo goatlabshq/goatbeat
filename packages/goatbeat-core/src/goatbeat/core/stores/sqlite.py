@@ -20,6 +20,7 @@ from goatbeat.core.execution import (
     Execution,
     ExecutionStatus,
     Lease,
+    LeaseInfo,
     SubmissionReceipt,
     idempotency_key_for,
 )
@@ -195,6 +196,19 @@ class SQLiteStore:
                 "WHERE partition = ? AND holder_id = ? AND fencing_token = ?",
                 (self._clock.now().timestamp_us, _PARTITION, lease.holder.value, lease.token.value),
             )
+
+    def current(self) -> LeaseInfo | None:
+        rows = self._read(
+            "SELECT holder_id, fencing_token, expires_at_us FROM goatbeat_lease "
+            "WHERE partition = ? AND holder_id IS NOT NULL",
+            (_PARTITION,),
+        )
+        if not rows:
+            return None
+        holder, token, expires_at_us = rows[0]
+        return LeaseInfo(
+            SchedulerId(holder), FencingToken(token), Instant.from_timestamp_us(expires_at_us)
+        )
 
     # ScheduleStore
 

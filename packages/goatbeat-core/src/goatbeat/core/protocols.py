@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import Protocol
 
-from goatbeat.core.execution import Execution, Lease, SubmissionReceipt
+from goatbeat.core.execution import Execution, Lease, LeaseInfo, SubmissionReceipt
 from goatbeat.core.ids import IdempotencyKey, ScheduleId, SchedulerId
 from goatbeat.core.misfire import OccurrencePlan
 from goatbeat.core.schedule import Schedule, ScheduleDefinition
@@ -18,6 +18,10 @@ class LeaseManager(Protocol):
         ...
 
     def release(self, lease: Lease) -> None: ...
+
+    def current(self) -> LeaseInfo | None:
+        """The last holder, for status reports; None before anyone ever held the lease."""
+        ...
 
 
 class ScheduleStore(Protocol):

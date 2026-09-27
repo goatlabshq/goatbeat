@@ -9,7 +9,7 @@ from datetime import timedelta
 from typing import Final
 
 from goatbeat.core.errors import ConfigurationError, LeaseLostError
-from goatbeat.core.execution import ExecutionStatus, Lease, SubmissionReceipt
+from goatbeat.core.execution import ExecutionStatus, Lease, LeaseInfo, SubmissionReceipt
 from goatbeat.core.ids import IdempotencyKey, SchedulerId
 from goatbeat.core.misfire import Claim, OccurrencePlan
 from goatbeat.core.protocols import LeaseManager, ScheduleStore
@@ -102,6 +102,19 @@ class StoreConformance(ABC):
         sut.leases.release(first)
         assert sut.leases.acquire(ALICE, TTL) is None
         assert sut.leases.acquire(BOB, TTL) == second
+
+    def test_the_current_lease_is_described(self) -> None:
+        sut = self._setup()
+        assert sut.leases.current() is None
+        lease = self._leader(sut)
+        info = sut.leases.current()
+        assert info == LeaseInfo(ALICE, lease.token, sut.clock.now() + TTL)
+        sut.clock.advance(timedelta(seconds=5))
+        sut.leases.release(lease)
+        released = sut.leases.current()
+        assert released is not None
+        assert released.expires_at == sut.clock.now()
+        assert not released.held_at(sut.clock.now())
 
     # Schedules
 

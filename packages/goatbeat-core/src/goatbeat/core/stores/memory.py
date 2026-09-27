@@ -12,6 +12,7 @@ from goatbeat.core.execution import (
     Execution,
     ExecutionStatus,
     Lease,
+    LeaseInfo,
     SubmissionReceipt,
     idempotency_key_for,
 )
@@ -60,6 +61,13 @@ class MemoryStore:
         with self._changed:
             if self._holds(lease):
                 self._lease.expires_at = self._clock.now()
+
+    def current(self) -> LeaseInfo | None:
+        with self._changed:
+            row = self._lease
+            if row.holder is None or row.expires_at is None:
+                return None
+            return LeaseInfo(row.holder, row.token, row.expires_at)
 
     # ScheduleStore
 

@@ -32,6 +32,16 @@ class Lease:
 
 
 @dataclass(frozen=True, slots=True)
+class LeaseInfo:
+    holder: SchedulerId
+    token: FencingToken
+    expires_at: Instant
+
+    def held_at(self, instant: Instant) -> bool:
+        return self.expires_at > instant
+
+
+@dataclass(frozen=True, slots=True)
 class Execution:
     schedule_id: ScheduleId
     scheduled_at: Instant

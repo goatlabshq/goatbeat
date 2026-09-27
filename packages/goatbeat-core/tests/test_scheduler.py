@@ -13,7 +13,7 @@ from goatbeat.core.errors import (
     StoreUnavailableError,
     SubmissionError,
 )
-from goatbeat.core.execution import ExecutionStatus, Lease, SubmissionReceipt
+from goatbeat.core.execution import ExecutionStatus, Lease, LeaseInfo, SubmissionReceipt
 from goatbeat.core.ids import SchedulerId
 from goatbeat.core.misfire import MisfireRules, OccurrencePlan
 from goatbeat.core.registry import DEFAULT_INTERVAL_ANCHOR, Registry
@@ -60,6 +60,9 @@ class UnavailableLeases:
 
     def release(self, lease: Lease) -> None:
         del lease
+        raise StoreUnavailableError("connection refused")
+
+    def current(self) -> LeaseInfo | None:
         raise StoreUnavailableError("connection refused")
 
 

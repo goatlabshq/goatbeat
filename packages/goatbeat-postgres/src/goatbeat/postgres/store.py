@@ -14,6 +14,7 @@ from goatbeat.core.execution import (
     Execution,
     ExecutionStatus,
     Lease,
+    LeaseInfo,
     SubmissionReceipt,
     idempotency_key_for,
 )
@@ -139,6 +140,20 @@ class PostgresStore:
                 "WHERE partition = %s AND holder_id = %s AND fencing_token = %s",
                 [self._now(), _PARTITION, lease.holder.value, lease.token.value],
             )
+
+    def current(self) -> LeaseInfo | None:
+        with self._provider.transaction() as cursor:
+            cursor.execute(
+                "SELECT holder_id, fencing_token, expires_at FROM goatbeat_lease "
+                "WHERE partition = %s AND holder_id IS NOT NULL",
+                [_PARTITION],
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return LeaseInfo(
+            SchedulerId(_text(row[0])), FencingToken(_integer(row[1])), _instant(row[2])
+        )
 
     # ScheduleStore
 
