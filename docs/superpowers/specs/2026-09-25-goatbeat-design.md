@@ -331,9 +331,9 @@ setting. Validation fails fast (`ConfigurationError` listing every invalid field
 ## 11. CLI
 
 `goatbeat scheduler`, `goatbeat status [--json]`, `goatbeat doctor [--json]`,
-`goatbeat schedule list [--json]`, `goatbeat schedule run <name>`, `goatbeat postgres migrate`.
+`goatbeat schedule list [--json]`, `goatbeat schedule run <name>`, `goatbeat migrate`.
 Built on `argparse`. Exit codes: 0 success, 1 check failed, 2 usage error, 3 configuration
-error, 4 store unavailable.
+error, 4 store unavailable, 5 unexpected error.
 
 ## 12. Observability
 

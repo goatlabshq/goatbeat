@@ -127,10 +127,14 @@ goatbeat --app myproject.beat:app doctor        # exit 1 when a check fails
 ```
 
 Exit codes: 0 success, 1 check failed, 2 usage error, 3 configuration error, 4 store
-unavailable. With `DJANGO_SETTINGS_MODULE` set and no `--app`, the command uses the Django
+unavailable, 5 unexpected error. `--log-format json` emits one JSON object per event on stderr.
+`sqlite:///beat.db` is relative to the working directory, `sqlite:////var/lib/beat.db` absolute.
+Every command publishes the schedules declared in the app before reading the store, so run it
+with the same code version as your schedulers. With `DJANGO_SETTINGS_MODULE` set and no `--app`, the command uses the Django
 project. Submitters: `goatbeat.celery.CelerySubmitter`, `goatbeat.dramatiq.DramatiqSubmitter`,
 `goatbeat.rq.RQSubmitter` and `goatbeat.django.submitter.DjangoTasksSubmitter`; each passes the
-idempotency key as the message id. Metrics: `goatbeat.prometheus.PrometheusMetrics` and
+idempotency key as the message id. No backend deduplicates on that id: a resubmission after a
+crash runs the task twice, so tasks must be idempotent (they can read `goatbeat_key`). Metrics: `goatbeat.prometheus.PrometheusMetrics` and
 `goatbeat.otel.OpenTelemetryMetrics` (`GoatbeatApp(metrics=...)`).
 
 ## Guarantees
