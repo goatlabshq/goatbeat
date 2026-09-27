@@ -28,10 +28,8 @@ class CommandFailedError(Exception):
 
 
 def run_scheduler(environment: Environment, *, once: bool, metrics_port: int | None) -> int:
-    metrics = environment.metrics
-    if metrics_port is not None:
-        metrics = runtime.prometheus_metrics()
-        runtime.start_http_server(metrics_port)
+    environment.ready()
+    metrics = runtime.scheduler_metrics(environment.metrics, metrics_port)
     scheduler = Scheduler(
         store=environment.store,
         leases=environment.leases,
@@ -41,8 +39,11 @@ def run_scheduler(environment: Environment, *, once: bool, metrics_port: int | N
         metrics=metrics,
     )
     if once:
-        scheduler.start()
-        scheduler.tick()
+        try:
+            scheduler.start()
+            scheduler.tick()
+        finally:
+            scheduler.release()
         return SUCCESS
     stop = threading.Event()
 
@@ -58,6 +59,7 @@ def run_scheduler(environment: Environment, *, once: bool, metrics_port: int | N
 
 def publish(environment: Environment) -> None:
     """Code-declared schedules must be in the store before anything reads it."""
+    environment.ready()
     environment.store.sync_code_schedules(environment.registry.definitions(), SystemClock().now())
 
 
@@ -148,18 +150,13 @@ def _run_checks(environment: Environment) -> Sequence[Check]:
     publish(environment)
     schedules = environment.store.list_schedules()
     checks = [Check("store", ok=True, detail=f"{len(schedules)} schedules readable")]
-    missing = sorted(
-        {
-            s.definition.task.path
-            for s in schedules
-            if not environment.task_exists(s.definition.task.path)
-        }
-    )
+    paths = sorted({schedule.definition.task.path for schedule in schedules})
+    missing = [problem for path in paths if (problem := environment.task_problem(path))]
     checks.append(
         Check(
             "tasks",
             ok=not missing,
-            detail="every task imports" if not missing else f"cannot import: {', '.join(missing)}",
+            detail="every task imports" if not missing else "; ".join(missing),
         )
     )
     return [*checks, *backend]

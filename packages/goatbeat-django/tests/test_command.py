@@ -83,7 +83,8 @@ def test_prune_disables_code_schedules_no_longer_declared() -> None:
 def test_the_standalone_cli_uses_the_django_project(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "configured-by-the-test-harness")
+    # Any importable module: the test harness has already configured the settings.
+    monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "sampleapp.urls")
     monkeypatch.delenv("GOATBEAT_APP", raising=False)
     assert main(["schedule", "list", "--json"]) == 0
     names = [item["name"] for item in json.loads(capsys.readouterr().out)]

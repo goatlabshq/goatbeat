@@ -34,3 +34,18 @@ def broken_app() -> GoatbeatApp:
 
 
 not_an_app = 42
+
+
+def app_with_broken_module() -> GoatbeatApp:
+    registry = _registry()
+    registry.schedule(name="broken", task=TaskCall("broken_tasks.run"), every="1h")
+    return GoatbeatApp(registry=registry, submitter=RecordingSubmitter())
+
+
+def app_with_prometheus() -> GoatbeatApp:
+    from prometheus_client import CollectorRegistry
+
+    from goatbeat.prometheus import PrometheusMetrics
+
+    metrics = PrometheusMetrics(CollectorRegistry())
+    return GoatbeatApp(registry=_registry(), submitter=RecordingSubmitter(), metrics=metrics)

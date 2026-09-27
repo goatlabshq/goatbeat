@@ -78,7 +78,7 @@ def test_status_reports_the_leader_and_schedules(capsys: pytest.CaptureFixture[s
     status = json.loads(out)
     assert code == 0
     assert status["leader"]["holder"] == "cli-tests"
-    assert status["leader"]["held"] is True
+    assert status["leader"]["token"] == 1
     assert status["schedules"] == {"total": 1, "enabled": 1}
     assert status["next_wakeup"].endswith("+00:00")
 
@@ -168,3 +168,91 @@ def test_sigterm_stops_the_scheduler_and_releases_the_lease(tmp_path: Path) -> N
         check=True,
     )
     assert json.loads(status.stdout)["leader"]["held"] is False
+
+
+def test_a_fresh_postgresql_database_asks_for_a_migration(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = database_url_from_env()
+    if url is None:
+        pytest.skip("GOATBEAT_TEST_DATABASE_URL is not set")
+    monkeypatch.delenv("DJANGO_SETTINGS_MODULE", raising=False)
+    with isolated_schema(url) as scoped:
+        monkeypatch.setenv("GOATBEAT_DATABASE_URL", scoped)
+        for command in (["status"], ["schedule", "list"], ["scheduler", "--once"]):
+            code, _, err = run(capsys, *APP, *command)
+            assert code == 3, command
+            assert "goatbeat migrate" in err
+
+
+@pytest.mark.usefixtures("sqlite_url")
+def test_doctor_reports_a_task_module_that_fails_to_import(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code, out, _ = run(capsys, "--app", "cli_app:app_with_broken_module", "doctor")
+    assert code == 1
+    assert "broken_tasks.run" in out
+    assert "nonexistent_dependency_for_goatbeat_tests" in out
+
+
+@pytest.mark.usefixtures("sqlite_url")
+@pytest.mark.parametrize("url", ["sqlite://host/x.db", "sqlite:/abs.db", "sqlite:///"])
+def test_malformed_sqlite_urls_are_configuration_errors(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("GOATBEAT_DATABASE_URL", url)
+    code, _, err = run(capsys, *APP, "status")
+    assert code == 3
+    assert "Traceback" not in err
+
+
+@pytest.mark.usefixtures("sqlite_url")
+def test_an_unexpected_error_has_its_own_exit_code(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def explode(*args: object, **kwargs: object) -> int:
+        del args, kwargs
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("goatbeat.cli.commands.status", explode)
+    code, _, err = run(capsys, *APP, "status")
+    assert code == 5
+    assert "boom" in err
+
+
+@pytest.mark.usefixtures("sqlite_url")
+def test_app_prometheus_metrics_are_reused_by_the_metrics_port(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ports: list[int] = []
+    monkeypatch.setattr("goatbeat.cli.environment.start_http_server", ports.append)
+    arguments = ("--app", "cli_app:app_with_prometheus", "scheduler", "--once")
+    assert run(capsys, *arguments, "--metrics-port", "9464")[0] == 0
+    assert run(capsys, *arguments, "--metrics-port", "9465")[0] == 0
+    assert ports == [9464, 9465]
+
+
+@pytest.mark.usefixtures("sqlite_url")
+def test_a_single_tick_releases_the_lease(capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(capsys, *APP, "scheduler", "--once")[0] == 0
+    status = json.loads(run(capsys, *APP, "status", "--json")[1])
+    assert status["leader"]["held"] is False
+
+
+@pytest.mark.usefixtures("sqlite_url")
+def test_scheduler_events_are_logged_as_json(capsys: pytest.CaptureFixture[str]) -> None:
+    code, _, err = run(capsys, *APP, "--log-format", "json", "scheduler", "--once")
+    assert code == 0
+    events = [json.loads(line)["event"] for line in err.splitlines() if line.startswith("{")]
+    assert "lease.acquired" in events
+
+
+def test_a_missing_django_settings_module_is_reported_as_such(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "nosuch.settings")
+    monkeypatch.delenv("GOATBEAT_APP", raising=False)
+    code, _, err = run(capsys, "status")
+    assert code == 3
+    assert "nosuch.settings" in err
+    assert "pip install" not in err

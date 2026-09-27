@@ -7,10 +7,13 @@ from typing import Final
 
 from goatbeat.cli import commands
 from goatbeat.cli.environment import Environment, open_environment
+from goatbeat.cli.logs import configure_logging, is_database_unavailable
 from goatbeat.core.errors import ConfigurationError, StoreUnavailableError
 
 CONFIGURATION_ERROR: Final = 3
 STORE_UNAVAILABLE: Final = 4
+UNEXPECTED_ERROR: Final = 5
+LOG_LEVELS: Final = ("DEBUG", "INFO", "WARNING", "ERROR")
 
 type Handler = Callable[[Environment, argparse.Namespace], int]
 
@@ -18,6 +21,8 @@ type Handler = Callable[[Environment, argparse.Namespace], int]
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="goatbeat", description=__doc__)
     root.add_argument("--app", help="module:attribute of a GoatbeatApp (or GOATBEAT_APP)")
+    root.add_argument("--log-level", choices=LOG_LEVELS, default="INFO")
+    root.add_argument("--log-format", choices=("text", "json"), default="text")
     sub = root.add_subparsers(dest="command", required=True)
 
     scheduler = sub.add_parser("scheduler", help="run the scheduler until SIGTERM")
@@ -52,6 +57,7 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parser().parse_args(argv)
     handler: Handler = arguments.handler
+    configure_logging(arguments.log_level, as_json=arguments.log_format == "json")
     try:
         with open_environment(arguments.app) as environment:
             return handler(environment, arguments)
@@ -64,6 +70,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     except commands.CommandFailedError as error:
         sys.stderr.write(f"goatbeat: {error}\n")
         return commands.CHECK_FAILED
+    except Exception as error:
+        if is_database_unavailable(error):
+            sys.stderr.write(f"goatbeat: store unavailable: {error}\n")
+            return STORE_UNAVAILABLE
+        sys.stderr.write(f"goatbeat: unexpected error: {type(error).__name__}: {error}\n")
+        return UNEXPECTED_ERROR
 
 
 def _scheduler(environment: Environment, arguments: argparse.Namespace) -> int:

@@ -6,13 +6,14 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from importlib import import_module
+from importlib.util import find_spec
 from typing import Final
 from urllib.parse import urlsplit
 
 from goatbeat.core.app import GoatbeatApp
 from goatbeat.core.config import GoatbeatConfig
-from goatbeat.core.errors import ConfigurationError, TaskNotFoundError
-from goatbeat.core.observability import MetricsSink, NoopMetrics
+from goatbeat.core.errors import ConfigurationError
+from goatbeat.core.observability import FanoutMetrics, MetricsSink, NoopMetrics
 from goatbeat.core.protocols import LeaseManager, ScheduleStore, TaskSubmitter
 from goatbeat.core.registry import SupportsDefinitions
 from goatbeat.core.stores.memory import MemoryStore
@@ -42,12 +43,17 @@ def no_checks() -> Sequence[Check]:
     return ()
 
 
-def importable(path: str) -> bool:
+def always_ready() -> None:
+    """Stores that create their schema on open are always ready."""
+
+
+def import_problem(path: str) -> str | None:
+    """Why ``path`` cannot be imported, including errors raised by the task's own module."""
     try:
         import_object(path)
-    except TaskNotFoundError:
-        return False
-    return True
+    except Exception as error:
+        return f"{path}: {type(error).__name__}: {error}"
+    return None
 
 
 @dataclass(slots=True)
@@ -60,7 +66,8 @@ class Environment:
     metrics: MetricsSink
     backend_checks: Callable[[], Sequence[Check]] = no_checks
     migrate: Callable[[], str] | None = None
-    task_exists: Callable[[str], bool] = importable
+    task_problem: Callable[[str], str | None] = import_problem
+    ready: Callable[[], None] = always_ready
 
 
 def start_http_server(port: int) -> None:
@@ -72,12 +79,20 @@ def start_http_server(port: int) -> None:
     serve(port)
 
 
-def prometheus_metrics() -> MetricsSink:
+def scheduler_metrics(configured: MetricsSink, port: int | None) -> MetricsSink:
+    """Serve Prometheus on ``port``, reusing the app's own Prometheus sink when it has one."""
+    if port is None:
+        return configured
     try:
         from goatbeat.prometheus import PrometheusMetrics  # noqa: PLC0415
     except ImportError as error:
         raise ConfigurationError(PROMETHEUS_HINT) from error
-    return PrometheusMetrics()
+    start_http_server(port)
+    if isinstance(configured, PrometheusMetrics):
+        return configured
+    if isinstance(configured, NoopMetrics):
+        return PrometheusMetrics()
+    return FanoutMetrics(configured, PrometheusMetrics())
 
 
 @contextmanager
@@ -124,12 +139,22 @@ def _standalone_environment(
         memory = MemoryStore(SystemClock())
         return _environment(app, config, memory, memory)
     if scheme == "sqlite":
-        sqlite = SQLiteStore(url.removeprefix(SQLITE_PREFIX), SystemClock())
+        sqlite = SQLiteStore(_sqlite_path(url), SystemClock())
         stack.callback(sqlite.close)
         return _environment(app, config, sqlite, sqlite)
     if scheme in {"postgres", "postgresql", LIBPQ_KEYWORDS}:
         return _postgres_environment(stack, app, config, url)
     raise ConfigurationError(f"unsupported database URL scheme {scheme!r}")
+
+
+def _sqlite_path(url: str) -> str:
+    path = url.removeprefix(SQLITE_PREFIX)
+    if not url.startswith(SQLITE_PREFIX) or not path or urlsplit(url).netloc:
+        raise ConfigurationError(
+            f"SQLite URLs look like {SQLITE_PREFIX}relative.db or {SQLITE_PREFIX}/absolute.db, "
+            f"got {url!r}"
+        )
+    return path
 
 
 def _environment(
@@ -164,16 +189,24 @@ def _postgres_environment(
     notifier = stack.enter_context(PsycopgNotifier(url))
     store = PostgresStore(provider, notifier=notifier)
 
-    def checks() -> Sequence[Check]:
+    def schema_problem() -> str | None:
         version = applied_version(provider)
+        if version < SCHEMA_VERSION:
+            return f"schema at version {version}, expected {SCHEMA_VERSION}: run goatbeat migrate"
+        if version > SCHEMA_VERSION:
+            return f"schema at version {version} is newer than this release: upgrade goatbeat"
+        return None
+
+    def ready() -> None:
+        problem = schema_problem()
+        if problem is not None:
+            raise ConfigurationError(problem)
+
+    def checks() -> Sequence[Check]:
+        problem = schema_problem()
         drift = database_clock(provider) - SystemClock().now()
         return (
-            Check(
-                "schema",
-                version == SCHEMA_VERSION,
-                f"database at version {version}, this release expects {SCHEMA_VERSION}"
-                + ("" if version == SCHEMA_VERSION else ": run goatbeat migrate"),
-            ),
+            Check("schema", problem is None, problem or f"at version {SCHEMA_VERSION}"),
             Check(
                 "clock",
                 abs(drift) <= MAX_CLOCK_DRIFT,
@@ -187,6 +220,7 @@ def _postgres_environment(
     environment = _environment(app, config, store, store)
     environment.backend_checks = checks
     environment.migrate = apply_migrations
+    environment.ready = ready
     return environment
 
 
@@ -194,8 +228,8 @@ def _django_environment(stack: ExitStack) -> Environment:
     """``DJANGO_SETTINGS_MODULE`` set and no ``--app``: use the project's own setup."""
     try:
         import django  # noqa: PLC0415
+        from django.core.exceptions import ImproperlyConfigured  # noqa: PLC0415
 
-        django.setup()
         from goatbeat.django import registry  # noqa: PLC0415
         from goatbeat.django.conf import DjangoSettings  # noqa: PLC0415
         from goatbeat.django.provider import DjangoProvider, notifier_conninfo  # noqa: PLC0415
@@ -204,6 +238,13 @@ def _django_environment(stack: ExitStack) -> Environment:
         from goatbeat.postgres.store import PostgresStore  # noqa: PLC0415
     except ImportError as error:
         raise ConfigurationError("Django projects need: pip install goatbeat[django]") from error
+    module = os.environ.get(DJANGO_VARIABLE, "")
+    try:
+        if find_spec(module) is None:
+            raise ImportError(f"no module named {module!r}")
+        django.setup()
+    except (ImportError, ImproperlyConfigured) as error:
+        raise ConfigurationError(f"cannot load the Django settings {module!r}: {error}") from error
     settings = DjangoSettings.from_django()
     notifier = stack.enter_context(PsycopgNotifier(notifier_conninfo(settings.database)))
     store = PostgresStore(DjangoProvider(settings.database), notifier=notifier)
@@ -214,7 +255,7 @@ def _django_environment(stack: ExitStack) -> Environment:
         registry=registry(),
         submitter=DjangoTasksSubmitter(),
         metrics=NoopMetrics(),
-        task_exists=is_django_task,
+        task_problem=lambda path: None if is_django_task(path) else f"{path}: not a Django task",
     )
     environment.migrate = lambda: "Django projects migrate with: python manage.py migrate"
     return environment
