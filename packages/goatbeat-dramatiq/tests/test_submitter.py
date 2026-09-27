@@ -51,12 +51,24 @@ def test_the_idempotency_key_is_the_message_id() -> None:
     assert (decoded.args, decoded.kwargs) == ((42,), {"subject": "hi"})
 
 
-def test_queue_and_priority_are_routed() -> None:
+def test_the_queue_is_routed() -> None:
     broker.declare_queue("low")
-    DramatiqSubmitter().submit(submission(routing=Routing(queue="low", priority=3)))
-    decoded = decode(broker.queues["low"].get_nowait())
-    assert decoded.queue_name == "low"
-    assert decoded.options["broker_priority"] == 3
+    DramatiqSubmitter().submit(submission(routing=Routing(queue="low")))
+    assert decode(broker.queues["low"].get_nowait()).queue_name == "low"
+
+
+def test_priority_is_rejected_on_brokers_that_ignore_it() -> None:
+    with pytest.raises(SubmissionError, match="RabbitMQ"):
+        DramatiqSubmitter().submit(submission(routing=Routing(priority=3)))
+
+
+def test_resubmitting_reuses_the_message_id() -> None:
+    submitter = DramatiqSubmitter()
+    submitter.submit(submission())
+    submitter.submit(submission())
+    queue = broker.queues["default"]
+    ids = {decode(queue.get_nowait()).message_id, decode(queue.get_nowait()).message_id}
+    assert ids == {KEY.value}
 
 
 @pytest.mark.parametrize(

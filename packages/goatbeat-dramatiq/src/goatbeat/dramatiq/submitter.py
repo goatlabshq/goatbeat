@@ -1,6 +1,6 @@
 """Enqueues scheduled occurrences as Dramatiq messages whose id is the idempotency key."""
 
-from typing import Protocol, Self, cast
+from typing import Final, Protocol, Self, cast
 
 from dramatiq import Actor
 from dramatiq.errors import DramatiqError
@@ -8,6 +8,9 @@ from goatbeat.core.errors import SubmissionError, TaskNotFoundError
 from goatbeat.core.execution import SubmissionReceipt
 from goatbeat.core.submission import TaskSubmission
 from goatbeat.core.tasks import import_task
+
+# Compared by name so the RabbitMQ client (pika) is never imported for the check.
+RABBITMQ_BROKER: Final = "RabbitmqBroker"
 
 
 class _Message(Protocol):
@@ -46,6 +49,8 @@ class DramatiqSubmitter:
         actor = _resolve(submission.task.path)
         options: dict[str, object] = {}
         if routing.priority is not None:
+            if type(actor.broker).__name__ != RABBITMQ_BROKER:
+                raise SubmissionError("Dramatiq honors priorities on RabbitMQ brokers only")
             options["broker_priority"] = routing.priority
         message = actor.message_with_options(
             args=submission.task.args, kwargs=dict(submission.task.kwargs), **options
