@@ -29,10 +29,21 @@ Goatbeat are skipped.
 | `IntervalSchedule(every, period)` | `every=` interval, anchored on `start_time` if set |
 | `CrontabSchedule` | `cron=` with the crontab's timezone |
 | `PeriodicTask.task`, `args`, `kwargs` | task path and JSON arguments |
-| `queue`, `priority` | routing |
+| `queue`, `priority` | routing, checked against your Django Tasks backend |
 | `enabled` | enabled (see below) |
 | `SolarSchedule`, `ClockedSchedule` | skipped: no equivalent |
-| `one_off`, `expires`, `exchange`, `routing_key`, `headers` | dropped, reported per task |
+| `one_off`, `expires`, `expire_seconds`, `exchange`, `routing_key`, `headers` | dropped, reported per task |
+| `start_time` on a crontab | dropped, reported (Goatbeat runs from the next match) |
+
+Rows are never re-synced: a task edited in django-celery-beat after the import keeps its imported
+version. Skipped rows include solar and clocked schedules, crontabs restricting both day of month
+and day of week (celery requires both to match, cron either), and syntax cron does not accept
+(wrap-around ranges such as `fri-mon`, full day names). A queue or priority your backend refuses
+(celery allows priorities up to 255, Django Tasks -100 to 100) is imported disabled with a note.
+
+Interval schedules without `start_time` are anchored on the Unix epoch, not on the last run: an
+hourly task runs at minute 0, a weekly one on Thursdays at 00:00 UTC. Set `start_time` in
+django-celery-beat before importing if that matters.
 
 Imported schedules are store schedules, editable in the admin. Their misfire policy is
 `run_once`, the closest match to celery beat, which also runs a missed task once.
@@ -40,8 +51,8 @@ Imported schedules are store schedules, editable in the admin. Their misfire pol
 ## 4. Port the tasks
 
 Celery task names are not Django tasks. A periodic task whose path is not a
-`django.tasks.Task` is imported **disabled**, with a note. Port the function to `@task` (keeping
-its import path, or editing the schedule in the admin), then enable it.
+`django.tasks.Task` is imported **disabled**, with a note. Port the function to `@task` under
+the same import path (the admin refuses non-Django paths), then enable each schedule.
 
 To keep running the Celery tasks themselves, use `goatbeat-celery` with the standalone command
 instead of Django Tasks:

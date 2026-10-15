@@ -18,7 +18,7 @@ the lease, and exit 0.
 | `GOATBEAT_APP` | | `module:attribute` of the `GoatbeatApp` (or `--app`) |
 | `GOATBEAT_DATABASE_URL` | | `postgresql://...` (or `sqlite:///file` for development) |
 | `GOATBEAT_SCHEDULER_ID` | `host:pid:random` | name in logs, metrics and the lease |
-| `GOATBEAT_TIMEZONE` | `UTC` | default timezone of cron schedules |
+| `GOATBEAT_TIMEZONE` | `UTC` | default cron timezone of admin-created schedules (Django); in code, pass `Registry(timezone=...)` |
 | `GOATBEAT_LEASE_TTL` | `30s` | how long a lease lives without renewal |
 | `GOATBEAT_LEASE_RENEW_INTERVAL` | `10s` | must be less than half the TTL |
 | `GOATBEAT_MAX_SLEEP` | `60s` | longest sleep between ticks |
@@ -30,8 +30,8 @@ Invalid values stop the process at startup with every problem listed.
 ## Health checks
 
 - Liveness: the process is running.
-- Readiness and alerting: `goatbeat doctor --json` (exit 1 on any failed check) and the
-  `goatbeat_leader` metric, which must sum to 1 across schedulers.
+- Readiness and alerting: `goatbeat doctor --json` (exit 1 on any failed check) and, when a
+  metrics sink is configured, the `goatbeat_leader` metric, which must sum to 1 across schedulers.
 
 ## Command line exit codes
 

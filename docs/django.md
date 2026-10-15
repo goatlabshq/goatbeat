@@ -50,8 +50,8 @@ python manage.py goatbeat schedule prune       # disable code schedules no longe
 python manage.py goatbeat import_celery_beat   # see the migration guide
 ```
 
-The standalone `goatbeat` command also works: with `DJANGO_SETTINGS_MODULE` set and no `--app`,
-it uses the Django project.
+The standalone `goatbeat` command also works: with `DJANGO_SETTINGS_MODULE` set and neither
+`--app` nor `GOATBEAT_APP`, it uses the Django project.
 
 Give the scheduler process persistent connections (`CONN_MAX_AGE`, `CONN_HEALTH_CHECKS`).
 Goatbeat reuses its connection and replaces it only after an error.

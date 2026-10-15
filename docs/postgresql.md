@@ -22,9 +22,10 @@ Each scheduler uses a small pool (up to 4 connections) plus one dedicated connec
 
 ## Poolers
 
-PgBouncer in **transaction** mode works for the store: Goatbeat uses no session state between
-transactions. The `LISTEN` connection must reach PostgreSQL directly (or a session-mode pool);
-without it, schedulers fall back to polling every `max_sleep`.
+PgBouncer in **transaction** mode works for the store: Goatbeat keeps no session state between
+transactions and never uses server-side prepared statements. `LISTEN` does not work through a
+transaction-mode pool, and it uses the same connection string; behind such a pooler, schedulers
+fall back to polling every `max_sleep`, or point Goatbeat at a session-mode pool.
 
 ## Permissions
 

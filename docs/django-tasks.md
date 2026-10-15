@@ -27,7 +27,9 @@ def send_report(goatbeat_key: str = "") -> None:
     ...
 ```
 
-Use it to make the task idempotent: in rare crash windows an occurrence is submitted twice.
+Declare such a task with `task=call(send_report)`: the extra parameter makes it a task with
+arguments for the type checker. Use the key to make the task idempotent: in rare crash windows an
+occurrence is submitted twice.
 
 ## Completion tracking
 

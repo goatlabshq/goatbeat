@@ -32,7 +32,7 @@ services:
 
   migrate:
     <<: *goatbeat
-    command: ["goatbeat", "migrate"]
+    command: ["sh", "-c", "goatbeat migrate && python -m demo.setup"]
     depends_on:
       postgres:
         condition: service_healthy

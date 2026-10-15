@@ -48,6 +48,5 @@ them.
 
 ## String paths
 
-Only the admin and the `django-celery-beat` importer create schedules from strings. They
-validate the path before saving: it must import, and in Django mode it must be a
-`django.tasks.Task`.
+Only the admin and the `django-celery-beat` importer create schedules from strings. The admin
+only accepts `django.tasks.Task` paths; the importer imports other paths disabled, with a note.

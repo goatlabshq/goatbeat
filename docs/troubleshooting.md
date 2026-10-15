@@ -22,7 +22,7 @@ version and the clock drift between the host and PostgreSQL.
   Tasks, check that workers load the `goatbeat.django` app so `task_finished` reaches it.
 
 **Executions become `failed`**
-: The backend refused the task `max_submit_retries` times. The `error` column says why: unknown
+: The backend refused the task on every attempt (one plus `max_submit_retries` retries). The `error` column says why: unknown
   task, unknown queue, unsupported routing, broker down.
 
 **A task ran twice**

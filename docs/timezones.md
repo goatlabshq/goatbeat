@@ -1,7 +1,8 @@
 # Timezones
 
-Inside Goatbeat every instant is an aware UTC datetime. A naive datetime is rejected with
-`NaiveDatetimeError`; it is never interpreted in some local zone.
+Inside Goatbeat every instant is an aware UTC datetime. A naive datetime is rejected
+(`NaiveDatetimeError`, or `ConfigurationError` when passed to `Registry.schedule`); it is never
+interpreted in some local zone.
 
 Cron schedules are evaluated in their own timezone: the `timezone=` argument, else the registry
 default, else UTC (Django: `TIME_ZONE`).
@@ -18,7 +19,7 @@ Goatbeat follows Vixie cron, the behavior most operators already expect.
 An hour field counts as "every hour" when it matches all 24 hours (`*`, `*/1`, `0-23`).
 
 Gaps at midnight (some zones change at 00:00) and half-hour shifts (Australia/Lord_Howe) follow
-the same rules; they are covered by the test suite.
+the same rules.
 
 ## Changing a schedule's timezone
 

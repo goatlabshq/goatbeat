@@ -39,5 +39,5 @@ until `schedule prune` runs with the new code.
 ## Network partitions
 
 A scheduler cut off from PostgreSQL stops dispatching when its local deadline passes, before
-another instance can acquire the lease. Connections use TCP keepalives so a half-open
-connection is noticed in about a minute.
+another instance can acquire the lease. With the standalone command, connections use TCP keepalives so
+a half-open connection is noticed in about a minute; in Django, set `keepalives` in `OPTIONS`.

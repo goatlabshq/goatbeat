@@ -52,7 +52,7 @@ saving rules.
 | `claimed` | the occurrence is reserved, submission pending |
 | `dispatched` | the backend accepted the task |
 | `submit_failed` | the backend refused it; a retry is scheduled |
-| `failed` | submission failed `max_submit_retries` times (5 by default) |
+| `failed` | the first submission and `max_submit_retries` retries (5 by default) all failed |
 | `skipped` | the misfire policy decided not to run it |
 | `completed`, `task_failed` | the task finished (tracked for Django Tasks) |
 

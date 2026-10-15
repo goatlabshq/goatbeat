@@ -29,8 +29,9 @@ do damage:
 ## When PostgreSQL is down
 
 Every scheduler stops dispatching: no lease can be renewed. They retry with exponential backoff
-(1 s up to 30 s) and resume once the database is back. Nothing is dispatched twice, and missed
-occurrences are handled by the [misfire policy](misfire.md).
+at every renewal interval and resume once the database is back. No occurrence is claimed twice;
+an occurrence submitted just before the outage but not yet recorded is resubmitted with the same
+key (the at-least-once window). Missed occurrences follow the [misfire policy](misfire.md).
 
 ## When the task backend is down
 

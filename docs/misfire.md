@@ -17,7 +17,8 @@ beat.schedule(
 
 ## `run_once` (default)
 
-Run only the most recent late occurrence. The others are counted in its `missed_count`. After a
+Run only the most recent late occurrence. The others are counted in its `missed_count` (for cron
+schedules, a lower bound past 10,000 missed occurrences). After a
 three-hour outage, an hourly schedule runs once, with `missed_count=2`.
 
 ## `skip`

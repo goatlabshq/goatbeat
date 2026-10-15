@@ -3,7 +3,7 @@
 **Schedule once. Dispatch reliably. Scale everywhere.**
 
 Goatbeat is a type-safe periodic task scheduler for Python. It decides what is due, makes sure
-each occurrence is claimed exactly once even when several schedulers run at the same time, and
+each occurrence is claimed at most once even when several schedulers run at the same time, and
 hands the work to your task backend: Django 6.1 Tasks, Celery, Dramatiq or RQ. It never executes
 tasks itself.
 

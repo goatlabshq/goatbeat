@@ -1,15 +1,15 @@
 # Distributed example
 
-PostgreSQL, Redis, three Goatbeat schedulers and two RQ workers. Each run of a task inserts a
-row into `demo_runs`, so you can check that every occurrence ran exactly once even though three
-schedulers compete for it.
+PostgreSQL, Redis, three Goatbeat schedulers and two RQ workers. Each run of a task inserts a row
+into `demo_runs` with its RQ job id, derived from the occurrence's idempotency key, so you can
+check that no occurrence was claimed twice even though three schedulers compete for it.
 
 ```bash
 docker compose up --build -d
 docker compose logs -f scheduler        # one lease.acquired, then occurrence.dispatched
-docker compose stop scheduler-1         # or kill the leader: a standby takes over
+docker kill distributed-scheduler-1     # whichever logged lease.acquired: a standby takes over
 docker compose exec postgres psql -U goatbeat -c \
-  "SELECT name, count(*) FROM demo_runs GROUP BY name"
+  "SELECT name, count(*), count(DISTINCT job_id) FROM demo_runs GROUP BY name"
 docker compose run --rm scheduler goatbeat status
 docker compose down -v
 ```
