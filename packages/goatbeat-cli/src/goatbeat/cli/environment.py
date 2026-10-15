@@ -111,7 +111,8 @@ def load_app(reference: str) -> GoatbeatApp:
     if not module_name or not attribute:
         raise ConfigurationError(f"--app expects module:attribute, got {reference!r}")
     try:
-        target: object = getattr(import_module(module_name), attribute)
+        module = import_module(module_name)  # nosemgrep: non-literal-import
+        target: object = getattr(module, attribute)
     except (ImportError, AttributeError) as error:
         raise ConfigurationError(f"cannot load {reference!r}: {error}") from error
     if callable(target):

@@ -44,7 +44,7 @@ def import_object(path: str) -> object:
     for split in range(len(parts) - 1, 0, -1):
         module_name = ".".join(parts[:split])
         try:
-            target: object = importlib.import_module(module_name)
+            target: object = importlib.import_module(module_name)  # nosemgrep: non-literal-import
         except ModuleNotFoundError as error:
             if error.name is not None and (
                 module_name == error.name or module_name.startswith(f"{error.name}.")

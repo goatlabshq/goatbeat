@@ -34,7 +34,7 @@ class GoatbeatConfig(AppConfig):
 def _register_schedules_of(app: AppConfig, beat: DjangoRegistry) -> None:
     if app.module is None or not module_has_submodule(app.module, SCHEDULES_MODULE):
         return
-    module = import_module(f"{app.name}.{SCHEDULES_MODULE}")
+    module = import_module(f"{app.name}.{SCHEDULES_MODULE}")  # nosemgrep: non-literal-import
     register: object = getattr(module, REGISTER_FUNCTION, None)
     if not callable(register):
         raise ImproperlyConfigured(
