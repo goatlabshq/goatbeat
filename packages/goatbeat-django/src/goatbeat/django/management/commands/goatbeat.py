@@ -9,6 +9,7 @@ from types import FrameType
 from typing import Final, override
 
 from django.core.management import BaseCommand, CommandError
+from django.db import ProgrammingError, connection
 
 from goatbeat.core.errors import ConfigurationError
 from goatbeat.core.ids import IdempotencyKey
@@ -16,7 +17,9 @@ from goatbeat.core.schedule import Schedule
 from goatbeat.core.time import SystemClock
 from goatbeat.core.triggers import CronTrigger
 from goatbeat.django import registry
+from goatbeat.django.celery_beat import LEGACY_QUERY, convert, read_legacy
 from goatbeat.django.runtime import cli_requester, scheduler, store
+from goatbeat.django.submitter import is_django_task
 
 STOP_SIGNALS: Final = (signal.SIGTERM, signal.SIGINT)
 
@@ -36,12 +39,18 @@ class Command(BaseCommand):
         run_now = actions.add_parser("run", help="ask the leader to run a schedule now")
         run_now.add_argument("name")
         actions.add_parser("prune", help="disable code schedules no longer declared")
+        importer = commands.add_parser(
+            "import_celery_beat", help="copy django-celery-beat periodic tasks into Goatbeat"
+        )
+        importer.add_argument("--dry-run", action="store_true", help="report without writing")
 
     @override
     def handle(self, *args: object, **options: object) -> None:
         del args
         if options["command"] == "scheduler":
             self._scheduler(once=bool(options["once"]))
+        elif options["command"] == "import_celery_beat":
+            self._import_celery_beat(dry_run=bool(options["dry_run"]))
         elif options["action"] == "list":
             self._list(as_json=bool(options["json"]))
         elif options["action"] == "run":
@@ -88,6 +97,29 @@ class Command(BaseCommand):
         key = IdempotencyKey(f"manual:{uuid.uuid4().hex}")
         execution = backend.request_run(schedule, key, cli_requester(), SystemClock().now())
         self.stdout.write(f"{execution.idempotency_key.value} {execution.status.value}")
+
+    def _import_celery_beat(self, *, dry_run: bool) -> None:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(LEGACY_QUERY)
+                legacy = read_legacy(cursor.fetchall())
+        except ProgrammingError as error:
+            raise CommandError(f"no django_celery_beat tables to import from: {error}") from error
+        backend = store()
+        now = SystemClock().now()
+        for task in legacy:
+            result = convert(task, task_exists=is_django_task)
+            notes = "; ".join(result.notes)
+            if result.definition is None:
+                self.stdout.write(f"skipped {task.name}: {notes}")
+                continue
+            if backend.get_schedule(task.name) is not None:
+                self.stdout.write(f"skipped {task.name}: a Goatbeat schedule has this name")
+                continue
+            if not dry_run:
+                backend.save_schedule(result.definition, now)
+            verb = "would import" if dry_run else "imported"
+            self.stdout.write(f"{verb} {task.name}" + (f" ({notes})" if notes else ""))
 
     def _prune(self) -> None:
         try:
