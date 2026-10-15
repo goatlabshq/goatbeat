@@ -84,3 +84,9 @@ def test_the_applied_version_and_the_database_clock_are_readable(conninfo: str) 
         assert applied_version(provider) == SCHEMA_VERSION
         drift = database_clock(provider) - SystemClock().now()
         assert abs(drift.total_seconds()) < 5
+
+
+def test_pooled_connections_never_prepare_statements(conninfo: str) -> None:
+    with PsycopgProvider.connect(conninfo) as provider, provider.transaction() as cursor:
+        connection = cursor.connection  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownVariableType]
+        assert connection.prepare_threshold is None  # pyright: ignore[reportUnknownMemberType]

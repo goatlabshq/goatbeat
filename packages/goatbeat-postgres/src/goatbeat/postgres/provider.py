@@ -70,6 +70,7 @@ class PsycopgProvider:
             max_size=max_size,
             timeout=POOL_WAIT_SECONDS,
             check=ConnectionPool.check_connection,
+            configure=_without_prepared_statements,
             open=False,
         )
         try:
@@ -104,3 +105,8 @@ class PsycopgProvider:
         traceback: TracebackType | None,
     ) -> None:
         self.close()
+
+
+# Server-side prepared statements are session state: PgBouncer transaction mode breaks them.
+def _without_prepared_statements(connection: psycopg.Connection[TupleRow]) -> None:
+    connection.prepare_threshold = None
