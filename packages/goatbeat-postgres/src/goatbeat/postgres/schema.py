@@ -1,5 +1,3 @@
-"""Versioned DDL. Django creates the same tables through its migrations (tested for equality)."""
-
 from datetime import datetime
 from typing import Final, LiteralString
 
@@ -131,7 +129,6 @@ def migrate(provider: ConnectionProvider) -> int:
 
 
 def applied_version(provider: ConnectionProvider) -> int:
-    """The schema version recorded in the database; 0 before the first migration."""
     with provider.transaction() as cursor:
         cursor.execute("SELECT to_regclass('goatbeat_schema_version') IS NOT NULL")
         exists = cursor.fetchone()

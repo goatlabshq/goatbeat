@@ -1,5 +1,3 @@
-"""Logging for the command line, and recognizing database outages from optional drivers."""
-
 import logging
 import sys
 from typing import Final, override
@@ -10,8 +8,6 @@ DATABASE_MODULES: Final = ("psycopg", "django.db")
 
 
 class TextFormatter(logging.Formatter):
-    """``time level event key=value ...``, readable in a terminal."""
-
     @override
     def format(self, record: logging.LogRecord) -> str:
         line = super().format(record)

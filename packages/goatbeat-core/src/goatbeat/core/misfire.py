@@ -1,5 +1,3 @@
-"""Misfire policies decide what happens to occurrences that are overdue."""
-
 from collections import deque
 from dataclasses import dataclass
 from datetime import timedelta
@@ -41,8 +39,6 @@ class MisfireRules:
 
 @dataclass(frozen=True, slots=True)
 class Claim:
-    """One execution row to create; ``missed_count`` counts occurrences it stands for."""
-
     scheduled_at: Instant
     status: Literal[ExecutionStatus.CLAIMED, ExecutionStatus.SKIPPED]
     missed_count: int = 0
@@ -95,7 +91,6 @@ def plan_occurrences(
 def _skip_ahead(
     trigger: Trigger, occurrence: Instant, late_before: Instant, late: _Late, rules: MisfireRules
 ) -> Instant:
-    """Count long runs of late interval occurrences arithmetically instead of one by one."""
     if not isinstance(trigger, IntervalTrigger) or occurrence >= late_before:
         return occurrence
     late_total = -((occurrence - late_before) // trigger.every)

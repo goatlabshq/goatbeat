@@ -1,5 +1,3 @@
-"""What the scheduler hands to a task backend."""
-
 from dataclasses import dataclass
 
 from goatbeat.core.execution import Execution

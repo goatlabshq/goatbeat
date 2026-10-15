@@ -1,5 +1,3 @@
-"""Enqueues scheduled occurrences as RQ jobs whose id derives from the idempotency key."""
-
 import hashlib
 from typing import Final, Protocol, cast
 

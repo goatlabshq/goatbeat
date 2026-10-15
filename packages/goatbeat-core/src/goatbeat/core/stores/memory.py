@@ -1,5 +1,3 @@
-"""In-process store for tests and single-process development; nothing survives a restart."""
-
 import threading
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -33,8 +31,6 @@ class _LeaseRow:
 
 
 class MemoryStore:
-    """Implements both ScheduleStore and LeaseManager; lease time comes from ``clock``."""
-
     def __init__(self, clock: Clock) -> None:
         self._clock = clock
         self._changed = threading.Condition()

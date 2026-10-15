@@ -1,5 +1,3 @@
-"""Enqueues scheduled occurrences as Dramatiq messages whose id is the idempotency key."""
-
 from typing import Final, Protocol, Self, cast
 
 from dramatiq import Actor
@@ -40,8 +38,6 @@ class _Actor(Protocol):
 
 
 class DramatiqSubmitter:
-    """Resolves the actor by import path and sends it through the actor's own broker."""
-
     def submit(self, submission: TaskSubmission) -> SubmissionReceipt:
         routing = submission.routing
         if routing.backend is not None:

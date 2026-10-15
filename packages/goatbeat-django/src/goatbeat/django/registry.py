@@ -1,5 +1,3 @@
-"""Typed schedule declarations for Django Tasks."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, overload
@@ -28,8 +26,6 @@ def call[**P, R](task: Task[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Task
 
 
 class DjangoRegistry:
-    """Accepts ``django.tasks.Task`` objects; arguments go through ``call`` so they are checked."""
-
     def __init__(self, *, timezone: str | ZoneInfo = "UTC") -> None:
         self._registry = Registry(timezone=timezone)
 

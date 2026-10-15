@@ -1,5 +1,3 @@
-"""A MetricsSink recording through the OpenTelemetry metrics API."""
-
 from opentelemetry.metrics import Meter
 
 from goatbeat.core.execution import ExecutionStatus

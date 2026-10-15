@@ -1,5 +1,3 @@
-"""Execution history types shared by stores, submitters and the scheduler."""
-
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum

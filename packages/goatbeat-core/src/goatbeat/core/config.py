@@ -1,5 +1,3 @@
-"""Typed configuration, validated at startup; invalid values never fall back to defaults."""
-
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta

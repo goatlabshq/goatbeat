@@ -1,5 +1,3 @@
-"""Timezone-safe instants and the clock abstraction."""
-
 from __future__ import annotations
 
 import time

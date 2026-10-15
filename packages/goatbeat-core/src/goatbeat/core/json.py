@@ -1,5 +1,3 @@
-"""JSON values: task arguments are stored, so they must survive a JSON round trip."""
-
 import math
 from collections.abc import Mapping, Sequence
 from typing import cast

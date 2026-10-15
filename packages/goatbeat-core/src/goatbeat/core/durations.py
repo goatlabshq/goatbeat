@@ -1,5 +1,3 @@
-"""Human-friendly durations such as "30s", "5m", "1h" or "1d"."""
-
 import re
 from datetime import timedelta
 from typing import Final

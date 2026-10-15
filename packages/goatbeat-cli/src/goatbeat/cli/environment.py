@@ -1,5 +1,3 @@
-"""Builds what every command needs: configuration, store, schedules, submitter and checks."""
-
 import os
 from collections.abc import Callable, Generator, Sequence
 from contextlib import ExitStack, contextmanager
@@ -44,11 +42,10 @@ def no_checks() -> Sequence[Check]:
 
 
 def always_ready() -> None:
-    """Stores that create their schema on open are always ready."""
+    pass
 
 
 def import_problem(path: str) -> str | None:
-    """Why ``path`` cannot be imported, including errors raised by the task's own module."""
     try:
         import_object(path)
     except Exception as error:
@@ -71,7 +68,6 @@ class Environment:
 
 
 def start_http_server(port: int) -> None:
-    """Serve Prometheus metrics; needs goatbeat-prometheus (and so prometheus-client)."""
     try:
         from prometheus_client import start_http_server as serve  # noqa: PLC0415
     except ImportError as error:
@@ -80,7 +76,6 @@ def start_http_server(port: int) -> None:
 
 
 def scheduler_metrics(configured: MetricsSink, port: int | None) -> MetricsSink:
-    """Serve Prometheus on ``port``, reusing the app's own Prometheus sink when it has one."""
     if port is None:
         return configured
     try:
@@ -225,7 +220,6 @@ def _postgres_environment(
 
 
 def _django_environment(stack: ExitStack) -> Environment:
-    """``DJANGO_SETTINGS_MODULE`` set and no ``--app``: use the project's own setup."""
     try:
         import django  # noqa: PLC0415
         from django.core.exceptions import ImproperlyConfigured  # noqa: PLC0415

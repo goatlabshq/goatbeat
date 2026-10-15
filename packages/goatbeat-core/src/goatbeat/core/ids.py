@@ -1,5 +1,3 @@
-"""Typed identifiers, so ids of different kinds cannot be mixed up."""
-
 import os
 import secrets
 import socket

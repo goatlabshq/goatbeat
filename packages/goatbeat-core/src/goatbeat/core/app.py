@@ -1,5 +1,3 @@
-"""What an application hands to the command line: its schedules and how to submit them."""
-
 from dataclasses import dataclass, field
 
 from goatbeat.core.observability import MetricsSink, NoopMetrics

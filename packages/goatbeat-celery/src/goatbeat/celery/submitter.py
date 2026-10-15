@@ -1,5 +1,3 @@
-"""Sends scheduled occurrences to Celery, using the idempotency key as the task id."""
-
 from kombu.exceptions import KombuError, OperationalError
 
 from celery import Celery

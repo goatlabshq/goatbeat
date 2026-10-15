@@ -1,5 +1,3 @@
-"""Admin form: every value is validated by the core types, the same as code declarations."""
-
 from datetime import timedelta
 from typing import Any, Final, override
 

@@ -1,5 +1,3 @@
-"""A development submitter that runs tasks in a local thread pool."""
-
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor
 from types import TracebackType

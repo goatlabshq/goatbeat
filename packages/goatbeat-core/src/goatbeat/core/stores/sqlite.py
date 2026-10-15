@@ -124,8 +124,6 @@ type _Row = sqlite3.Row
 
 
 class SQLiteStore:
-    """Implements ScheduleStore and LeaseManager on one SQLite file."""
-
     def __init__(
         self, path: Path | str, clock: Clock, logger: logging.Logger | None = None
     ) -> None:

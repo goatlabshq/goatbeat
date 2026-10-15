@@ -1,5 +1,3 @@
-"""``goatbeat``: run the scheduler, inspect it and manage schedules."""
-
 import argparse
 import sys
 from collections.abc import Callable, Sequence

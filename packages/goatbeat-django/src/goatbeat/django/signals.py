@@ -1,5 +1,3 @@
-"""Completion tracking: Django Tasks workers report back through ``task_finished``."""
-
 from __future__ import annotations
 
 import logging

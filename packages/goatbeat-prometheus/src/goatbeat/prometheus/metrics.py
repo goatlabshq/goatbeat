@@ -1,5 +1,3 @@
-"""A MetricsSink exporting to a prometheus_client registry."""
-
 from typing import Final
 
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histogram

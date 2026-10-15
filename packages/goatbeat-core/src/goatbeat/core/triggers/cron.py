@@ -1,5 +1,3 @@
-"""Cron schedules evaluated in a timezone, with Vixie cron rules for DST transitions."""
-
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta

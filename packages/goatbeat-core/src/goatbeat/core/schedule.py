@@ -1,5 +1,3 @@
-"""Schedule definitions (what the user declares) and schedules (what a store holds)."""
-
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Final
@@ -21,8 +19,6 @@ class ScheduleSource(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Routing:
-    """Backend-interpreted submission options."""
-
     queue: str | None = None
     priority: int | None = None
     backend: str | None = None

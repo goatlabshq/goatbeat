@@ -1,5 +1,3 @@
-"""The sub-commands; each returns a process exit code."""
-
 import json
 import signal
 import socket
@@ -24,7 +22,7 @@ STOP_SIGNALS: Final = (signal.SIGTERM, signal.SIGINT)
 
 
 class CommandFailedError(Exception):
-    """An expected failure reported to the user with exit code 1."""
+    pass
 
 
 def run_scheduler(environment: Environment, *, once: bool, metrics_port: int | None) -> int:

@@ -32,7 +32,6 @@ class GoatbeatConfig(AppConfig):
 
 
 def _register_schedules_of(app: AppConfig, beat: DjangoRegistry) -> None:
-    """Call ``register(beat)`` from ``<app>/schedules.py``, the way admin.py is discovered."""
     if app.module is None or not module_has_submodule(app.module, SCHEDULES_MODULE):
         return
     module = import_module(f"{app.name}.{SCHEDULES_MODULE}")

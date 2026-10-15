@@ -1,5 +1,3 @@
-"""The production store: every coordination statement of Goatbeat lives here, once."""
-
 import json
 import logging
 import time

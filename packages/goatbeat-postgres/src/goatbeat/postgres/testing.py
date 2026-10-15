@@ -1,5 +1,3 @@
-"""Helpers for testing against a real PostgreSQL: one throwaway schema per test."""
-
 import os
 import secrets
 from collections.abc import Generator
@@ -19,7 +17,6 @@ def database_url_from_env() -> str | None:
 
 @contextmanager
 def isolated_schema(url: str) -> Generator[str]:
-    """Create a schema, yield a conninfo whose search_path points at it, then drop it."""
     schema = f"goatbeat_test_{secrets.token_hex(6)}"
     with psycopg.connect(url, autocommit=True) as connection:
         connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))

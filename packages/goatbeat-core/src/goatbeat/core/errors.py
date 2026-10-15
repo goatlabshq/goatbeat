@@ -1,6 +1,3 @@
-"""Every error Goatbeat raises derives from GoatbeatError."""
-
-
 class GoatbeatError(Exception):
     pass
 

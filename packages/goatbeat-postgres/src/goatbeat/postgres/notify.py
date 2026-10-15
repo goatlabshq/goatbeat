@@ -1,5 +1,3 @@
-"""LISTEN/NOTIFY wake-ups, so schedulers see schedule changes before their next poll."""
-
 import logging
 import math
 import time

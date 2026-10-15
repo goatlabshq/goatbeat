@@ -1,5 +1,3 @@
-"""Assembles a scheduler from the Django settings."""
-
 import logging
 import socket
 from collections.abc import Generator

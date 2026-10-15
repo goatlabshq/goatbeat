@@ -1,5 +1,3 @@
-"""Goatbeat: a type-safe, distributed periodic task scheduler."""
-
 from pkgutil import extend_path
 
 # Editable installs give each workspace package its own sys.path entry; extending __path__

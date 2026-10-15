@@ -1,5 +1,3 @@
-"""Admin for schedules and their execution history; writes go through the store."""
-
 import uuid
 from dataclasses import replace
 from datetime import timedelta

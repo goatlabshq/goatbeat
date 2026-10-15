@@ -1,5 +1,3 @@
-"""Structured logging and metrics hooks; Prometheus and OpenTelemetry plug into MetricsSink."""
-
 import json
 import logging
 from datetime import UTC, datetime
@@ -44,8 +42,6 @@ def log_event(
 
 
 class JsonFormatter(logging.Formatter):
-    """One JSON object per line, carrying the structured fields of log_event."""
-
     @override
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, object] = {
@@ -92,8 +88,6 @@ class NoopMetrics:
 
 
 class FanoutMetrics:
-    """Sends every call to several sinks, for example Prometheus and OpenTelemetry together."""
-
     def __init__(self, *sinks: MetricsSink) -> None:
         self.sinks = sinks
 

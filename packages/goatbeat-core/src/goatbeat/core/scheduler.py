@@ -1,5 +1,3 @@
-"""The scheduler loop: hold the lease, claim due occurrences, submit them, sleep until useful."""
-
 import logging
 import threading
 import time
@@ -71,7 +69,6 @@ class Scheduler:
             self._store.sync_code_schedules(self._registry.definitions(), self._clock.now())
 
     def tick(self) -> Instant:
-        """Run one iteration and return when the next one is useful."""
         started = time.perf_counter()
         lease = self._keeper.ensure()
         if lease is not None:
@@ -114,7 +111,6 @@ class Scheduler:
             )
 
     def release(self) -> None:
-        """Give the lease up now, so a standby does not wait for it to expire."""
         self._keeper.release()
 
     def run_now(self, name: str) -> Execution:

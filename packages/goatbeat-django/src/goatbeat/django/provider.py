@@ -1,5 +1,3 @@
-"""Runs the PostgreSQL store on Django's own connection and transaction management."""
-
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import cast
@@ -48,7 +46,6 @@ def _drop_if_broken(connection: BaseDatabaseWrapper) -> None:
 
 
 def notifier_conninfo(alias: str = "default") -> str:
-    """A libpq connection string for LISTEN, built from the Django database settings."""
     settings = connections[alias].settings_dict
     parameters = {
         "dbname": settings.get("NAME"),

@@ -1,5 +1,3 @@
-"""The seams of the scheduler: every backend implements these protocols."""
-
 from collections.abc import Sequence
 from datetime import timedelta
 from typing import Protocol

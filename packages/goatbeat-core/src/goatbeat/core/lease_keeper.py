@@ -1,5 +1,3 @@
-"""Local view of the leader lease, with a monotonic deadline that never trusts wall clocks."""
-
 import logging
 from datetime import timedelta
 

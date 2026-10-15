@@ -1,5 +1,3 @@
-"""``manage.py goatbeat``: run the scheduler and manage schedules."""
-
 import json
 import signal
 import threading

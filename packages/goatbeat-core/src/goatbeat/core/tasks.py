@@ -1,5 +1,3 @@
-"""Typed task references: the arguments of a scheduled call are checked against its signature."""
-
 import importlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -42,7 +40,6 @@ def task_path(task: object) -> str:
 
 
 def import_object(path: str) -> object:
-    """Import ``package.module.attribute.nested`` by trying the longest module prefix first."""
     parts = path.split(".")
     for split in range(len(parts) - 1, 0, -1):
         module_name = ".".join(parts[:split])

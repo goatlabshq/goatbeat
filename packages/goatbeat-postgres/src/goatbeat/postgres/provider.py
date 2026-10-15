@@ -1,5 +1,3 @@
-"""Database access seam: every SQL statement of Goatbeat runs through a ConnectionProvider."""
-
 from collections.abc import Generator, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from types import TracebackType
@@ -54,8 +52,6 @@ class ConnectionProvider(Protocol):
 
 
 class PsycopgProvider:
-    """Standalone provider backed by a psycopg connection pool."""
-
     def __init__(self, pool: ConnectionPool[psycopg.Connection[TupleRow]]) -> None:
         self._pool = pool
 

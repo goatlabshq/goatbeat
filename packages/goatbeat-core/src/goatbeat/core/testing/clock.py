@@ -1,5 +1,3 @@
-"""A deterministic clock for tests."""
-
 from datetime import UTC, datetime, timedelta
 
 from goatbeat.core.time import Instant

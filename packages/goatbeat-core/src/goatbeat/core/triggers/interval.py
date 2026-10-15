@@ -1,5 +1,3 @@
-"""Fixed-rate schedules anchored on a start instant."""
-
 from dataclasses import dataclass
 from datetime import timedelta
 

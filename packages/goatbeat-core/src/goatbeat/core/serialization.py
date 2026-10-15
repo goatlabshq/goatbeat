@@ -1,5 +1,3 @@
-"""Column mapping of schedule definitions, shared by every SQL store."""
-
 import json
 from datetime import timedelta
 from typing import Final, TypedDict, cast

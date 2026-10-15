@@ -1,5 +1,3 @@
-"""Five-field cron expressions evaluated on naive wall-clock time."""
-
 import calendar
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -85,7 +83,6 @@ class CronExpression:
         return day_matches and weekday_matches
 
     def next_wall_time(self, after: datetime) -> datetime:
-        """Return the first matching naive wall time strictly after ``after``."""
         candidate = after.replace(second=0, microsecond=0) + timedelta(minutes=1)
         deadline = candidate + _SEARCH_HORIZON
         while candidate < deadline:

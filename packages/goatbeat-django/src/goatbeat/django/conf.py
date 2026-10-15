@@ -1,5 +1,3 @@
-"""The ``GOATBEAT`` setting, validated once at startup."""
-
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final, Self, cast

@@ -1,5 +1,3 @@
-"""The typed, explicit registry of code-declared schedules."""
-
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Final, Literal, Protocol, overload
@@ -21,8 +19,6 @@ type MisfirePolicyName = MisfirePolicy | Literal["run_once", "skip", "catch_up"]
 
 
 class SupportsDefinitions(Protocol):
-    """Anything that declares schedules: the core registry or a framework adapter's."""
-
     def definitions(self) -> tuple[ScheduleDefinition, ...]: ...
 
 
