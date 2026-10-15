@@ -3,8 +3,6 @@ site_description: A type-safe, distributed periodic task scheduler for Python an
 repo_url: https://github.com/midsonlajeanty/goatbeat
 repo_name: midsonlajeanty/goatbeat
 strict: true
-exclude_docs: |
-  superpowers/
 
 theme:
   name: material
