@@ -54,7 +54,10 @@ def notifier_conninfo(alias: str = "default") -> str:
         "host": settings.get("HOST"),
         "port": settings.get("PORT"),
     }
-    return make_conninfo(**{key: str(value) for key, value in parameters.items() if value})
+    options: dict[str, object] = dict(settings.get("OPTIONS") or {})
+    libpq = {key: value for key, value in options.items() if isinstance(value, str | int)}
+    merged = {**libpq, **{key: value for key, value in parameters.items() if value}}
+    return make_conninfo(**{key: str(value) for key, value in merged.items()})
 
 
 def _is_unavailable(error: DatabaseError) -> bool:

@@ -2,11 +2,12 @@ from typing import LiteralString
 
 import psycopg
 import pytest
-from django.db import ProgrammingError, connection
+from django.db import ProgrammingError, connection, connections
+from psycopg.conninfo import conninfo_to_dict
 
 from goatbeat.core.errors import StoreUnavailableError
 from goatbeat.core.testing import FakeClock, StoreConformance, StoreUnderTest
-from goatbeat.django.provider import DjangoProvider
+from goatbeat.django.provider import DjangoProvider, notifier_conninfo
 from goatbeat.postgres.store import PostgresStore
 from goatbeat.postgres.testing import database_url_from_env
 
@@ -81,3 +82,13 @@ def test_a_connection_killed_by_the_server_is_replaced() -> None:
     with provider.transaction() as cursor:
         cursor.execute("SELECT 1")
         assert cursor.fetchone() == (1,)
+
+
+def test_the_listen_connection_keeps_the_database_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = connection.settings_dict | {
+        "OPTIONS": {"sslmode": "verify-full", "application_name": "x"}
+    }
+    monkeypatch.setitem(connections["default"].__dict__, "settings_dict", settings)
+    conninfo = conninfo_to_dict(notifier_conninfo())
+    assert conninfo["sslmode"] == "verify-full"
+    assert conninfo["application_name"] == "x"
