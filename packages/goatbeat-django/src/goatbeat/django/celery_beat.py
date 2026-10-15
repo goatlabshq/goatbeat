@@ -24,7 +24,7 @@ EMPTY_HEADERS: Final = ("", "{}")
 
 LEGACY_QUERY: Final = (
     "SELECT t.name, t.task, t.args, t.kwargs, t.queue, t.priority, t.enabled, t.one_off, "
-    "t.start_time, t.expires, t.exchange, t.routing_key, t.headers, "
+    "t.start_time, t.expires, t.expire_seconds, t.exchange, t.routing_key, t.headers, "
     "i.every, i.period, c.minute, c.hour, c.day_of_month, c.month_of_year, c.day_of_week, "
     "c.timezone, t.solar_id IS NOT NULL, t.clocked_id IS NOT NULL "
     "FROM django_celery_beat_periodictask t "
@@ -68,6 +68,7 @@ class LegacyTask:
     one_off: bool
     start_time: datetime | None
     expires: datetime | None
+    expire_seconds: int | None
     exchange: str | None
     routing_key: str | None
     headers: str | None
@@ -88,25 +89,41 @@ class SkipError(Exception):
     pass
 
 
-def convert(legacy: LegacyTask, *, task_exists: Callable[[str], bool]) -> Conversion:
+def no_routing_problem(path: str, routing: Routing) -> str | None:
+    del path, routing
+    return None
+
+
+def convert(
+    legacy: LegacyTask,
+    *,
+    task_exists: Callable[[str], bool],
+    routing_problem: Callable[[str, Routing], str | None] = no_routing_problem,
+) -> Conversion:
     try:
         trigger = _trigger(legacy)
         args, kwargs = _arguments(legacy)
+        routing = Routing(queue=legacy.queue or None, priority=legacy.priority)
+        notes = _unsupported_options(legacy)
+        enabled = legacy.enabled
+        if not task_exists(legacy.task):
+            enabled = False
+            notes.append(f"{legacy.task} is not a Django task: imported disabled, port it first")
+        elif problem := routing_problem(legacy.task, routing):
+            enabled = False
+            notes.append(f"routing refused ({problem}): imported disabled, fix it in the admin")
+        definition = ScheduleDefinition(
+            name=legacy.name,
+            task=TaskCall(legacy.task, tuple(args), kwargs),
+            trigger=trigger,
+            misfire=MisfireRules(),
+            routing=routing,
+            enabled=enabled,
+        )
     except SkipError as skip:
         return Conversion(legacy.name, None, (str(skip),))
-    notes = list(_unsupported_options(legacy))
-    enabled = legacy.enabled
-    if not task_exists(legacy.task):
-        enabled = False
-        notes.append(f"{legacy.task} is not a Django task: imported disabled, port it first")
-    definition = ScheduleDefinition(
-        name=legacy.name,
-        task=TaskCall(legacy.task, tuple(args), kwargs),
-        trigger=trigger,
-        misfire=MisfireRules(),
-        routing=Routing(queue=legacy.queue or None, priority=legacy.priority),
-        enabled=enabled,
-    )
+    except (ConfigurationError, OverflowError, ValueError) as error:
+        return Conversion(legacy.name, None, (f"rejected: {error}",))
     return Conversion(legacy.name, definition, tuple(notes))
 
 
@@ -115,11 +132,11 @@ def read_legacy(rows: Sequence[Sequence[object]]) -> list[LegacyTask]:
 
 
 def _legacy_task(row: Sequence[object]) -> LegacyTask:
-    every, period = row[13], row[14]
+    every, period = row[14], row[15]
     crontab = None
-    if row[15] is not None:
-        minute, hour, day, month, weekday = (str(value or "*") for value in row[15:20])
-        crontab = Crontab(minute, hour, day, month, weekday, str(row[20] or "UTC"))
+    if row[16] is not None:
+        minute, hour, day, month, weekday = (str(value or "*") for value in row[16:21])
+        crontab = Crontab(minute, hour, day, month, weekday, str(row[21] or "UTC"))
     return LegacyTask(
         name=str(row[0]),
         task=str(row[1]),
@@ -131,13 +148,14 @@ def _legacy_task(row: Sequence[object]) -> LegacyTask:
         one_off=bool(row[7]),
         start_time=cast("datetime | None", row[8]),
         expires=cast("datetime | None", row[9]),
-        exchange=cast("str | None", row[10]),
-        routing_key=cast("str | None", row[11]),
-        headers=cast("str | None", row[12]),
+        expire_seconds=cast("int | None", row[10]),
+        exchange=cast("str | None", row[11]),
+        routing_key=cast("str | None", row[12]),
+        headers=cast("str | None", row[13]),
         interval=None if every is None else Interval(int(str(every)), str(period)),
         crontab=crontab,
-        solar=bool(row[21]),
-        clocked=bool(row[22]),
+        solar=bool(row[22]),
+        clocked=bool(row[23]),
     )
 
 
@@ -147,6 +165,11 @@ def _trigger(legacy: LegacyTask) -> Trigger:
     if legacy.clocked:
         raise SkipError("clocked (one-time) schedules have no Goatbeat equivalent")
     if legacy.crontab is not None:
+        if "*" not in (legacy.crontab.day_of_month, legacy.crontab.day_of_week):
+            raise SkipError(
+                "celery matches day of month and day of week together, cron matches either: "
+                "split it into two schedules"
+            )
         try:
             return CronTrigger.parse(legacy.crontab.expression, legacy.crontab.timezone)
         except ConfigurationError as error:
@@ -183,6 +206,8 @@ def _unsupported_options(legacy: LegacyTask) -> list[str]:
     ignored = {
         "one_off": legacy.one_off,
         "expires": legacy.expires is not None,
+        "expire_seconds": legacy.expire_seconds is not None,
+        "start_time": legacy.crontab is not None and legacy.start_time is not None,
         "exchange": bool(legacy.exchange),
         "routing_key": bool(legacy.routing_key),
         "headers": (legacy.headers or "").strip() not in EMPTY_HEADERS,

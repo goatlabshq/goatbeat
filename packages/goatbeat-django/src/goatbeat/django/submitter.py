@@ -12,6 +12,7 @@ from goatbeat.core.execution import ExecutionStatus, SubmissionReceipt, TaskOutc
 
 if TYPE_CHECKING:
     from goatbeat.core.json import JsonValue
+    from goatbeat.core.schedule import Routing
     from goatbeat.core.submission import TaskSubmission
 
 KEY_PARAMETER: Final = "goatbeat_key"
@@ -39,6 +40,16 @@ class DjangoTasksSubmitter:
             raise SubmissionError(str(error)) from error
         # Immediate backends run the task inside enqueue, before the dispatch is recorded.
         return SubmissionReceipt(result.id, outcome=_OUTCOMES.get(result.status))
+
+
+def routing_problem(path: str, routing: Routing) -> str | None:
+    try:
+        _resolve(path).using(
+            queue_name=routing.queue, priority=routing.priority, backend=routing.backend
+        )
+    except (SubmissionError, InvalidTask, InvalidTaskBackend) as error:
+        return str(error)
+    return None
 
 
 def is_django_task(path: str) -> bool:

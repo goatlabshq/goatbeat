@@ -17,7 +17,7 @@ from goatbeat.core.triggers import CronTrigger
 from goatbeat.django import registry
 from goatbeat.django.celery_beat import LEGACY_QUERY, convert, read_legacy
 from goatbeat.django.runtime import cli_requester, scheduler, store
-from goatbeat.django.submitter import is_django_task
+from goatbeat.django.submitter import is_django_task, routing_problem
 
 STOP_SIGNALS: Final = (signal.SIGTERM, signal.SIGINT)
 
@@ -102,11 +102,11 @@ class Command(BaseCommand):
                 cursor.execute(LEGACY_QUERY)
                 legacy = read_legacy(cursor.fetchall())
         except ProgrammingError as error:
-            raise CommandError(f"no django_celery_beat tables to import from: {error}") from error
+            raise CommandError(f"cannot read the django_celery_beat tables: {error}") from error
         backend = store()
         now = SystemClock().now()
         for task in legacy:
-            result = convert(task, task_exists=is_django_task)
+            result = convert(task, task_exists=is_django_task, routing_problem=routing_problem)
             notes = "; ".join(result.notes)
             if result.definition is None:
                 self.stdout.write(f"skipped {task.name}: {notes}")
@@ -115,7 +115,11 @@ class Command(BaseCommand):
                 self.stdout.write(f"skipped {task.name}: a Goatbeat schedule has this name")
                 continue
             if not dry_run:
-                backend.save_schedule(result.definition, now)
+                try:
+                    backend.save_schedule(result.definition, now)
+                except ConfigurationError as error:
+                    self.stdout.write(f"skipped {task.name}: {error}")
+                    continue
             verb = "would import" if dry_run else "imported"
             self.stdout.write(f"{verb} {task.name}" + (f" ({notes})" if notes else ""))
 

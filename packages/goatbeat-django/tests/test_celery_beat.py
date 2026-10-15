@@ -9,12 +9,13 @@ from django.db import connection
 
 from goatbeat.core.misfire import MisfirePolicy
 from goatbeat.core.registry import DEFAULT_INTERVAL_ANCHOR
-from goatbeat.core.schedule import ScheduleSource
+from goatbeat.core.schedule import Routing, ScheduleSource
 from goatbeat.core.tasks import TaskCall
 from goatbeat.core.time import Instant
 from goatbeat.core.triggers import CronTrigger, IntervalTrigger
 from goatbeat.django.celery_beat import Crontab, Interval, LegacyTask, convert
 from goatbeat.django.runtime import store
+from goatbeat.django.submitter import routing_problem
 
 TASK = LegacyTask(
     name="nightly",
@@ -27,6 +28,7 @@ TASK = LegacyTask(
     one_off=False,
     start_time=None,
     expires=None,
+    expire_seconds=None,
     exchange=None,
     routing_key=None,
     headers="{}",
@@ -40,6 +42,11 @@ TASK = LegacyTask(
 def always(path: str) -> bool:
     del path
     return True
+
+
+def refuse_routing(path: str, routing: Routing) -> str:
+    del path, routing
+    return "bad queue"
 
 
 def never(path: str) -> bool:
@@ -137,6 +144,39 @@ def test_options_goatbeat_does_not_support_are_reported() -> None:
         assert option in notes
 
 
+def test_both_day_fields_restricted_is_skipped_because_matching_differs() -> None:
+    legacy = replace(TASK, crontab=Crontab("0", "9", "1", "*", "mon", "UTC"))
+    result = convert(legacy, task_exists=always)
+    assert result.definition is None
+    assert "day of month and day of week" in " ".join(result.notes)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [{"crontab": None, "interval": Interval(2**31 - 1, "days")}, {"name": "   "}],
+)
+def test_rows_goatbeat_rejects_are_skipped_not_raised(change: dict[str, object]) -> None:
+    result = convert(replace(TASK, **change), task_exists=always)
+    assert result.definition is None
+    assert result.notes
+
+
+def test_routing_the_backend_refuses_is_imported_disabled() -> None:
+    legacy = replace(TASK, queue="celery", priority=200)
+    result = convert(legacy, task_exists=always, routing_problem=refuse_routing)
+    assert result.definition is not None
+    assert not result.definition.enabled
+    assert "bad queue" in " ".join(result.notes)
+
+
+def test_start_time_and_expire_seconds_on_crontabs_are_reported() -> None:
+    start = datetime(2027, 1, 1, tzinfo=UTC)
+    result = convert(replace(TASK, start_time=start, expire_seconds=60), task_exists=always)
+    notes = " ".join(result.notes)
+    assert "start_time" in notes
+    assert "expire_seconds" in notes
+
+
 def test_a_task_that_is_not_a_django_task_is_imported_disabled() -> None:
     result = convert(TASK, task_exists=never)
     assert result.definition is not None
@@ -159,7 +199,8 @@ LEGACY_DDL = (
         "name varchar(200) UNIQUE, task varchar(200), interval_id integer, crontab_id integer, "
         "solar_id integer, clocked_id integer, args text, kwargs text, queue varchar(200), "
         "exchange varchar(200), routing_key varchar(200), headers text, priority integer, "
-        "expires timestamptz, one_off boolean, start_time timestamptz, enabled boolean)"
+        "expires timestamptz, expire_seconds integer, one_off boolean, start_time timestamptz, "
+        "enabled boolean)"
     ),
     "INSERT INTO django_celery_beat_intervalschedule VALUES (1, 5, 'minutes')",
     "INSERT INTO django_celery_beat_crontabschedule VALUES (1, '0', '9', '1', '*', '*', 'UTC')",
@@ -213,13 +254,13 @@ def test_the_command_imports_and_reports_every_periodic_task() -> None:
     assert "imported legacy-ping" in report
     assert "imported legacy-weekly" in report
     assert "skipped legacy-solar" in report
-    assert "skipped ping" in report  # already declared in code
+    assert "skipped ping" in report
     weekly = store().get_schedule("legacy-weekly")
     assert weekly is not None
     assert weekly.source is ScheduleSource.STORE
     assert isinstance(weekly.definition.trigger, CronTrigger)
     assert weekly.definition.trigger.expression.text == "0 9 * * 1"
-    assert "skipped legacy-ping" in import_beat()  # idempotent
+    assert "skipped legacy-ping" in import_beat()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -228,3 +269,14 @@ def test_the_command_explains_a_missing_celery_beat_table() -> None:
 
     with pytest.raises(CommandError, match="django_celery_beat"):
         import_beat()
+
+
+def test_valid_django_routing_is_accepted() -> None:
+    assert (
+        routing_problem("sampleapp.tasks.send_report", Routing(queue="emails", priority=10)) is None
+    )
+
+
+@pytest.mark.parametrize("routing", [Routing(priority=200), Routing(queue="celery")])
+def test_django_routing_the_backend_refuses_is_reported(routing: Routing) -> None:
+    assert routing_problem("sampleapp.tasks.send_report", routing) is not None
