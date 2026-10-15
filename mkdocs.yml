@@ -1,0 +1,65 @@
+site_name: Goatbeat
+site_description: A type-safe, distributed periodic task scheduler for Python and Django Tasks.
+repo_url: https://github.com/midsonlajeanty/goatbeat
+repo_name: midsonlajeanty/goatbeat
+strict: true
+exclude_docs: |
+  superpowers/
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - tables
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Quickstart: quickstart.md
+      - Type-safe task definitions: typed-tasks.md
+      - Scheduling: scheduling.md
+      - Misfire policies: misfire.md
+      - Timezones: timezones.md
+  - Django:
+      - Django 6.1 integration: django.md
+      - Django Tasks integration: django-tasks.md
+      - Migration from django-celery-beat: migration.md
+  - Distributed operation:
+      - Architecture: architecture.md
+      - Locking: locking.md
+      - Failover: failover.md
+      - Multiple scheduler instances: multiple-schedulers.md
+      - Multiple workers: multiple-workers.md
+      - Distributed deployment: distributed-deployment.md
+  - Operations:
+      - PostgreSQL setup: postgresql.md
+      - Production deployment: production.md
+      - Observability: observability.md
+      - Performance: performance.md
+      - Security: security.md
+      - Troubleshooting: troubleshooting.md
