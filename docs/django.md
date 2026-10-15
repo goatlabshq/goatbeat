@@ -8,15 +8,15 @@ row locks and `LISTEN/NOTIFY`.
 ```python
 INSTALLED_APPS = [..., "goatbeat.django"]
 
-GOATBEAT = {                      # every key is optional
-    "database": "default",        # a PostgreSQL alias
-    "timezone": "Europe/Paris",   # defaults to TIME_ZONE
+GOATBEAT = {  # every key is optional
+    "database": "default",  # a PostgreSQL alias
+    "timezone": "Europe/Paris",  # defaults to TIME_ZONE
     "lease_ttl": "30s",
     "lease_renew_interval": "10s",
     "max_sleep": "60s",
     "batch_size": 500,
     "max_submit_retries": 5,
-    "scheduler_id": "web-1",      # defaults to host:pid:random
+    "scheduler_id": "web-1",  # defaults to host:pid:random
 }
 ```
 

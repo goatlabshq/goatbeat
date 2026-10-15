@@ -19,11 +19,13 @@ importable at module level: lambdas and nested functions are rejected.
 ```python
 from goatbeat import call
 
+
 def send_email(user_id: int, *, subject: str = "hello") -> None: ...
 
+
 beat.schedule(name="welcome", task=call(send_email, 42, subject="hi"), every="1d")
-call(send_email, "42")          # type error: str is not int
-call(send_email)                # type error: user_id is missing
+call(send_email, "42")  # type error: str is not int
+call(send_email)  # type error: user_id is missing
 call(send_email, 1, unknown=1)  # type error: no such parameter
 ```
 

@@ -6,7 +6,7 @@ the next occurrence strictly after it?
 ## Intervals
 
 ```python
-beat.schedule(name="ping", task=ping, every="30s")   # also "5m", "1h", "1d" or a timedelta
+beat.schedule(name="ping", task=ping, every="30s")  # also "5m", "1h", "1d" or a timedelta
 ```
 
 Occurrences fall on `start_at + k * every`. The default `start_at` is the Unix epoch, so a
