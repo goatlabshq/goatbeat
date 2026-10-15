@@ -21,21 +21,21 @@ dev = [
     "goatbeat-otel",
     "goatbeat-cli",
     "celery-types>=0.26",
-    "fakeredis>=2.30",
-    "opentelemetry-sdk>=1.30",
-    "croniter>=6.0",
-    "django-stubs>=6.1",
-    "hypothesis>=6.140",
-    "lefthook>=1.11",
-    "pyright[nodejs]>=1.1.405",
-    "psycopg[binary]>=3.2",
-    "pytest>=8.4",
+    "fakeredis>=2.39",
+    "opentelemetry-sdk>=1.45",
+    "croniter>=6.2",
+    "django-stubs>=6.1.2",
+    "hypothesis>=6.168",
+    "lefthook>=2.2",
+    "pyright[nodejs]>=1.1.414",
+    "psycopg[binary]>=3.3",
+    "pytest>=9.1",
     "pytest-django>=4.14",
-    "ruff>=0.13",
-    "twine>=6.2",
-    "types-croniter>=6.0",
+    "ruff>=0.16",
+    "twine>=7.0",
+    "types-croniter>=6.2",
 ]
-docs = ["mkdocs-material>=9.6"]
+docs = ["mkdocs-material>=9.7"]
 
 [tool.uv]
 package = false
