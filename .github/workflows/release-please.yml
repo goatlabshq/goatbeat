@@ -29,7 +29,6 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    # actionlint 1.7.12 does not parse the '$/' self-repository syntax zizmor prefers yet.
     uses: ./.github/workflows/release.yml # zizmor: ignore[self-repository]
     with:
       tag: ${{ needs.release-please.outputs.tag_name }}
