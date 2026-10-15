@@ -17,10 +17,13 @@ The design lives in `docs/superpowers/specs/2026-09-25-goatbeat-design.md`.
   incomplete are reached through narrow private protocols.
 - `packages/goatbeat-{prometheus,otel}`: `MetricsSink` implementations.
 - `packages/goatbeat-cli`: the `goatbeat` command. It imports backends lazily so optional
-  packages stay optional; exit codes 0/1/2/3/4 are part of its contract.
+  packages stay optional; exit codes 0 to 5 are part of its contract.
 - `packages/goatbeat`: facade distribution. It alone owns `goatbeat/__init__.py`; every other
   package is a namespace portion (`goatbeat/core/`, ...). `pkgutil.extend_path` in that file makes
   editable installs work at runtime.
+- `docs/`: mkdocs-material site (`uv run --only-group docs mkdocs build --strict`); `docs/superpowers`
+  holds the design spec and plans and is excluded from the site.
+- `examples/distributed`: compose stack with three schedulers and RQ workers.
 - `legacy/`: git-ignored django-celery-beat checkout, reference for the migration guide only.
 
 ## Rules
@@ -34,6 +37,8 @@ The design lives in `docs/superpowers/specs/2026-09-25-goatbeat-design.md`.
 - Coordination correctness never depends on scheduler clocks: lease expiry uses the store clock.
 - django-stubs generics are not subscriptable at runtime: parameterize Django base classes through
   `goatbeat/django/generics.py` and use `from __future__ import annotations` where `Task[...]` appears.
+- The zizmor `self-repository` audit is ignored inline on reusable workflow calls: actionlint
+  1.7.12 rejects the `$/` syntax it suggests.
 - Internal dependency pins and versions carry `# x-release-please-version`; release-please
   (`release/`) bumps them all together. Add new packages to `release/config.json`.
 

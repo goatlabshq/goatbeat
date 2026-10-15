@@ -1,0 +1,50 @@
+x-goatbeat: &goatbeat
+  build:
+    context: ../..
+    dockerfile: examples/distributed/Dockerfile
+  environment:
+    GOATBEAT_DATABASE_URL: postgresql://goatbeat:goatbeat@postgres:5432/goatbeat
+    REDIS_URL: redis://redis:6379/0
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: goatbeat
+      POSTGRES_PASSWORD: goatbeat
+      POSTGRES_DB: goatbeat
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goatbeat"]
+      interval: 1s
+      retries: 30
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      retries: 30
+
+  migrate:
+    <<: *goatbeat
+    command: ["goatbeat", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  scheduler:
+    <<: *goatbeat
+    command: ["goatbeat", "--log-format", "json", "scheduler"]
+    deploy:
+      replicas: 3
+
+  worker:
+    <<: *goatbeat
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "default"]
+    deploy:
+      replicas: 2
