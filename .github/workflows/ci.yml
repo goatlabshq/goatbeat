@@ -120,3 +120,10 @@ jobs:
           uv pip install --python "$RUNNER_TEMP/smoke" dist/*.whl
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/smoke/bin/python" "$GITHUB_WORKSPACE/scripts/smoke_test.py"
+      - name: Type-check a consumer project against the installed wheels
+        run: |
+          mkdir "$RUNNER_TEMP/consumer"
+          cp scripts/consumer.py "$RUNNER_TEMP/consumer/"
+          echo '{"typeCheckingMode": "strict"}' > "$RUNNER_TEMP/consumer/pyrightconfig.json"
+          uv run --directory "$RUNNER_TEMP/consumer" --project "$GITHUB_WORKSPACE" \
+            pyright --pythonpath "$RUNNER_TEMP/smoke/bin/python" consumer.py
