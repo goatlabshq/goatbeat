@@ -118,6 +118,8 @@ def _ensure_django_task(path: str) -> None:
         target: object = import_string(path)
     except ImportError as error:
         raise ConfigurationError(f"no Django task at {path!r}") from error
+    except Exception as error:
+        raise ConfigurationError(f"importing {path!r} failed: {error}") from error
     if not isinstance(target, Task):
         raise ConfigurationError(f"{path!r} is not a django.tasks.Task")
 

@@ -100,6 +100,7 @@ def test_an_interval_schedule_with_arguments_is_created(admin_client: Client) ->
         ("timezone", "Mars/Base"),
         ("task_path", "sampleapp.tasks.missing"),
         ("task_path", "sampleapp.tasks.RUNS"),
+        ("task_path", "sampleapp.broken.task"),
         ("max_catch_up", "0"),
     ],
 )
