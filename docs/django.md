@@ -56,6 +56,22 @@ The standalone `goatbeat` command also works: with `DJANGO_SETTINGS_MODULE` set 
 Give the scheduler process persistent connections (`CONN_MAX_AGE`, `CONN_HEALTH_CHECKS`).
 Goatbeat reuses its connection and replaces it only after an error.
 
+## Logging
+
+Goatbeat logs to the `goatbeat` logger. The event name is the message and the details
+(`schedule`, `idempotency_key`, `scheduler_id`, ...) are structured fields, which a plain
+formatter drops. Use the JSON formatter to keep them:
+
+```python
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"json": {"()": "goatbeat.core.observability.JsonFormatter"}},
+    "handlers": {"goatbeat": {"class": "logging.StreamHandler", "formatter": "json"}},
+    "loggers": {"goatbeat": {"handlers": ["goatbeat"], "level": "INFO", "propagate": False}},
+}
+```
+
 ## Admin
 
 - **Schedules**: list, filters, enabled flag, next run and last status, recent executions inline.
