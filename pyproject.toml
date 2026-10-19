@@ -35,7 +35,10 @@ dev = [
     "twine>=7.0",
     "types-croniter>=6.2",
 ]
-docs = ["mkdocs-material>=9.7"]
+docs = [
+    "mkdocs-llmstxt>=0.5.1",
+    "mkdocs-material>=9.7",
+]
 
 [tool.uv]
 package = false

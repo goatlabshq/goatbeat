@@ -25,6 +25,45 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
 
+plugins:
+  - search
+  - llmstxt:
+      full_output: llms-full.txt
+      markdown_description: >
+        Goatbeat is a type-safe, distributed periodic task scheduler for Python. It decides what
+        is due, coordinates several scheduler instances through a fenced lease stored in
+        PostgreSQL, claims each occurrence at most once and submits it to Django 6.1 Tasks,
+        Celery, Dramatiq or RQ, which run it. The core is framework-independent. Python 3.13 or
+        newer is required. Install with `pip install "goatbeat[postgres]" "psycopg[binary]"` or
+        `pip install "goatbeat[django]" "psycopg[binary]"` (also `[celery]`, `[dramatiq]`,
+        `[rq]`, `[prometheus]`, `[otel]`).
+      sections:
+        Getting started:
+          - index.md
+          - quickstart.md
+          - typed-tasks.md
+          - scheduling.md
+          - misfire.md
+          - timezones.md
+        Django:
+          - django.md
+          - django-tasks.md
+          - migration.md
+        Distributed operation:
+          - architecture.md
+          - locking.md
+          - failover.md
+          - multiple-schedulers.md
+          - multiple-workers.md
+          - distributed-deployment.md
+        Operations:
+          - postgresql.md
+          - production.md
+          - observability.md
+          - performance.md
+          - security.md
+          - troubleshooting.md
+
 markdown_extensions:
   - admonition
   - attr_list
