@@ -49,18 +49,25 @@ them.
 ## Celery, Dramatiq and RQ
 
 RQ takes plain functions, so `task=send_email` and `call(send_email, 42)` work as shown above.
-Celery and Dramatiq wrap functions in objects whose import path is not the name their workers
-know, so name the task explicitly with `TaskCall`:
+Celery tasks and Dramatiq actors are wrapper objects whose import path is not the name their
+workers know, so the core `call` rejects them. Use the backend's own `call`:
 
 ```python
-from goatbeat import TaskCall
+from goatbeat.celery import call as celery_call
+from goatbeat.dramatiq import call as dramatiq_call
 
-beat.schedule(name="ping", task=TaskCall("myproject.tasks.ping", (42,)), every="5m")
+beat.schedule(name="charge", task=celery_call(charge, 10), every="1h")
+beat.schedule(name="welcome", task=dramatiq_call(send_welcome, 42), every="1d")
 ```
 
-For Celery the path is the registered task name (`myproject.tasks.ping` unless the task sets
-`name=`); for Dramatiq it is the module attribute holding the actor. `goatbeat doctor` fails when
-a path does not import, so run it before deploying.
+`goatbeat.celery.call` uses the registered task name, custom `name=` included.
+`goatbeat.dramatiq.call` uses the module attribute that holds the actor. Both check arguments
+like the core `call`, except that Celery types `@app.task` loosely: `@shared_task` keeps the
+signature. `TaskCall("name", args)` also works when the task object is not importable where the
+schedules are declared.
+
+`goatbeat doctor` checks that every task path imports, so it reports a Celery task whose `name=`
+is not its import path; that report is expected.
 
 ## String paths
 

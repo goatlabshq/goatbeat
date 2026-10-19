@@ -14,3 +14,8 @@ def send_email(user_id: int, subject: str = "hello") -> None:
 
 
 NOT_AN_ACTOR = 42
+
+
+@dramatiq.actor(actor_name="billing.charge")
+def charge() -> None:
+    pass

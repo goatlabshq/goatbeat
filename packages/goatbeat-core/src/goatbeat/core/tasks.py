@@ -1,4 +1,5 @@
 import importlib
+import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
@@ -32,6 +33,12 @@ def task_path(task: object) -> str:
     module_path: object = getattr(task, "module_path", None)
     if isinstance(module_path, str):
         return module_path
+    if not inspect.isfunction(task) and not inspect.isbuiltin(task):
+        # Celery and Dramatiq wrap functions; the wrapper's import path is not its task name.
+        raise ConfigurationError(
+            f"{task!r} is not a function: use goatbeat.celery.call, goatbeat.dramatiq.call "
+            "or name the task with TaskCall"
+        )
     module: object = getattr(task, "__module__", None)
     qualname: object = getattr(task, "__qualname__", None)
     if not isinstance(module, str) or not isinstance(qualname, str) or "<" in qualname:

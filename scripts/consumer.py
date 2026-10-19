@@ -17,10 +17,12 @@ from goatbeat import (
     call,
 )
 from goatbeat.celery import CelerySubmitter
+from goatbeat.celery import call as celery_call
 from goatbeat.cli.main import main
 from goatbeat.core.time import SystemClock
 from goatbeat.django import DjangoRegistry, registry
 from goatbeat.dramatiq import DramatiqSubmitter
+from goatbeat.dramatiq import call as dramatiq_call
 from goatbeat.otel import OpenTelemetryMetrics
 from goatbeat.postgres.notify import PsycopgNotifier
 from goatbeat.postgres.provider import PsycopgProvider
@@ -62,4 +64,4 @@ error: type[Exception] = GoatbeatError
 print(is_leader, status, task, error, main, SQLiteStore)
 print(PostgresStore, PsycopgProvider, PsycopgNotifier, migrate)
 print(DjangoRegistry, registry, CelerySubmitter, DramatiqSubmitter, RQSubmitter, job_id_for)
-print(PrometheusMetrics, OpenTelemetryMetrics)
+print(PrometheusMetrics, OpenTelemetryMetrics, celery_call, dramatiq_call)

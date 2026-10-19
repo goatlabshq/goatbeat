@@ -26,6 +26,20 @@ def test_lambdas_and_local_functions_are_rejected() -> None:
         task_path(local)
 
 
+def test_wrapper_objects_are_rejected_because_their_path_is_not_their_name() -> None:
+    class Wrapper:
+        def __init__(self) -> None:
+            self.__module__ = "framework.local"
+            self.__qualname__ = "send"
+
+        def __call__(self) -> None: ...
+
+    with pytest.raises(ConfigurationError, match="TaskCall"):
+        task_path(Wrapper())
+    with pytest.raises(ConfigurationError, match="TaskCall"):
+        call(Wrapper())
+
+
 def test_call_binds_json_arguments() -> None:
     bound = call(send_email, 42, subject="report")
     assert bound == TaskCall("sample_tasks.send_email", (42,), {"subject": "report"})
