@@ -78,7 +78,7 @@ class DjangoRegistry:
         backend: str | None = None,
         enabled: bool = True,
     ) -> ScheduleDefinition:
-        bound = task if isinstance(task, TaskCall) else TaskCall(task.module_path)
+        bound = task if isinstance(task, TaskCall) else TaskCall(_module_path(task))
         if cron is not None and every is None:
             return self._registry.schedule(
                 name=name,
@@ -111,3 +111,10 @@ class DjangoRegistry:
 
     def definitions(self) -> tuple[ScheduleDefinition, ...]:
         return self._registry.definitions()
+
+
+def _module_path(task: object) -> str:
+    path: object = getattr(task, "module_path", None)
+    if not isinstance(path, str):
+        raise ConfigurationError(f"{task!r} is not a django.tasks.Task: decorate it with @task")
+    return path

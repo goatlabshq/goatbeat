@@ -49,3 +49,12 @@ def test_duplicate_names_are_rejected() -> None:
     beat.schedule(name="r", task=send_report, every="1h")
     with pytest.raises(ConfigurationError):
         beat.schedule(name="r", task=send_report, every="2h")
+
+
+def plain_function() -> None:
+    pass
+
+
+def test_a_function_that_is_not_a_django_task_is_rejected_clearly() -> None:
+    with pytest.raises(ConfigurationError, match="decorate it with @task"):
+        DjangoRegistry().schedule(name="r", task=plain_function, every="1h")  # pyright: ignore[reportArgumentType]
