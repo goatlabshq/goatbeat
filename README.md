@@ -43,8 +43,8 @@ scheduler.run(threading.Event())
 ```
 
 `call(send_email, "42")` is a type error: task arguments are checked against the task
-signature. SQLite and `CallableSubmitter` are for development; production uses PostgreSQL and
-a real task backend such as Django Tasks.
+signature. The Django app needs PostgreSQL, in development and tests too; SQLite and
+`CallableSubmitter` are for plain Python experiments only.
 
 ## Production: PostgreSQL
 
@@ -72,7 +72,7 @@ occurrences in under a second (`tests/performance`).
 ## Django 6.1
 
 ```bash
-pip install "goatbeat[django]"
+pip install "goatbeat[django]" "psycopg[binary]"
 ```
 
 ```python

@@ -46,6 +46,22 @@ them.
 `@task` functions. `DjangoRegistry.schedule` accepts a zero-argument `Task` or the result of
 `call`; passing a task that needs arguments without `call` is a type error.
 
+## Celery, Dramatiq and RQ
+
+RQ takes plain functions, so `task=send_email` and `call(send_email, 42)` work as shown above.
+Celery and Dramatiq wrap functions in objects whose import path is not the name their workers
+know, so name the task explicitly with `TaskCall`:
+
+```python
+from goatbeat import TaskCall
+
+beat.schedule(name="ping", task=TaskCall("myproject.tasks.ping", (42,)), every="5m")
+```
+
+For Celery the path is the registered task name (`myproject.tasks.ping` unless the task sets
+`name=`); for Dramatiq it is the module attribute holding the actor. `goatbeat doctor` fails when
+a path does not import, so run it before deploying.
+
 ## String paths
 
 Only the admin and the `django-celery-beat` importer create schedules from strings. The admin

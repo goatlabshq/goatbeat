@@ -3,8 +3,10 @@
 ## Plain Python
 
 ```bash
-pip install "goatbeat[postgres,rq]"
+pip install "goatbeat[postgres,rq]" "psycopg[binary]"
 ```
+
+`psycopg[binary]` bundles libpq; leave it out only when libpq is installed system-wide.
 
 Declare schedules next to your tasks:
 
@@ -40,8 +42,11 @@ For local experiments, `GOATBEAT_DATABASE_URL=sqlite:///beat.db` and the in-proc
 ## Django
 
 ```bash
-pip install "goatbeat[django]"
+pip install "goatbeat[django]" "psycopg[binary]"
 ```
+
+The database alias Goatbeat uses (`default` unless `GOATBEAT["database"]` says otherwise) must be
+PostgreSQL, in development and tests too: the app refuses to start on another engine.
 
 ```python
 # settings.py

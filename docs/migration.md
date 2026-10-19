@@ -6,7 +6,7 @@ then you switch which process schedules them.
 ## 1. Install and migrate
 
 ```bash
-pip install "goatbeat[django]"
+pip install "goatbeat[django]" "psycopg[binary]"
 ```
 
 Add `"goatbeat.django"` to `INSTALLED_APPS` and run `python manage.py migrate`. Keep
