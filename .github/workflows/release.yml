@@ -51,14 +51,6 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Claim every pending PyPI project
-        run: |
-          for _ in dist/*.whl; do
-            oidc=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=pypi" | jq -r .value)
-            jq -n --arg token "$oidc" '{token: $token}' \
-              | curl -fsS -o /dev/null -X POST https://pypi.org/_/oidc/mint-token -d @-
-          done
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           attestations: false
