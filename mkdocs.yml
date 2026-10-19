@@ -1,7 +1,9 @@
 site_name: Goatbeat
 site_description: A type-safe, distributed periodic task scheduler for Python and Django Tasks.
-repo_url: https://github.com/midsonlajeanty/goatbeat
-repo_name: midsonlajeanty/goatbeat
+repo_url: https://github.com/goatlabshq/goatbeat
+site_url: https://goatlabshq.github.io/goatbeat/
+repo_name: goatlabshq/goatbeat
+edit_uri: edit/main/docs/
 strict: true
 
 theme:

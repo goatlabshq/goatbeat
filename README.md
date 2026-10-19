@@ -9,8 +9,8 @@ Goatbeat decides what is due, coordinates several scheduler instances through a 
 claims each occurrence exactly once and submits it to your task backend. Execution stays the
 job of Django Tasks, Celery, Dramatiq or RQ.
 
-Status: under active development. See the
-[design](docs/superpowers/specs/2026-09-25-goatbeat-design.md).
+Status: under active development. The [documentation](https://goatlabshq.github.io/goatbeat/)
+covers setup, scheduling, Django, deployment and operations.
 
 ## Quickstart
 

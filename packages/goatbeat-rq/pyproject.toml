@@ -23,8 +23,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/midsonlajeanty/goatbeat"
-Issues = "https://github.com/midsonlajeanty/goatbeat/issues"
+Homepage = "https://github.com/goatlabshq/goatbeat"
+Documentation = "https://goatlabshq.github.io/goatbeat/"
+Issues = "https://github.com/goatlabshq/goatbeat/issues"
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
