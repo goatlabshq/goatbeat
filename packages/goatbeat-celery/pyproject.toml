@@ -1,6 +1,6 @@
 [project]
 name = "goatbeat-celery"
-version = "0.1.0" # x-release-please-version
+version = "0.2.0" # x-release-please-version
 description = "Celery submitter for Goatbeat."
 readme = "README.md"
 license = "MIT"
@@ -19,7 +19,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "goatbeat-core==0.1.0", # x-release-please-version
+    "goatbeat-core==0.2.0", # x-release-please-version
     "celery>=5.5",
 ]
 

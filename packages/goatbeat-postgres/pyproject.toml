@@ -1,6 +1,6 @@
 [project]
 name = "goatbeat-postgres"
-version = "0.1.0" # x-release-please-version
+version = "0.2.0" # x-release-please-version
 description = "PostgreSQL storage, fenced leases and LISTEN/NOTIFY for Goatbeat."
 readme = "README.md"
 license = "MIT"
@@ -18,7 +18,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "goatbeat-core==0.1.0", # x-release-please-version
+    "goatbeat-core==0.2.0", # x-release-please-version
     "psycopg>=3.2",
     "psycopg-pool>=3.2",
 ]

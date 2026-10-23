@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.0](https://github.com/goatlabshq/goatbeat/compare/v0.1.0...v0.2.0) (2026-10-23)
+
+
+### Features
+
+* **django:** choose the task submitter with the GOATBEAT setting ([686f7c4](https://github.com/goatlabshq/goatbeat/commit/686f7c4db99a5a723e852365a226b2c29ca8afb7))
+
+
+### Bug Fixes
+
+* **django:** pass only libpq options to the notifier connection ([882f750](https://github.com/goatlabshq/goatbeat/commit/882f7509740bac8345deee19e7b75593b7ea62eb))
+* **django:** release the lease after a single scheduler tick ([67d80be](https://github.com/goatlabshq/goatbeat/commit/67d80be9b93f0449ae44b51dbb2319c302f86af2))
+
+
+### Documentation
+
+* document the Celery prefork failure on Python 3.14 ([aeff4ae](https://github.com/goatlabshq/goatbeat/commit/aeff4aee82ddc9c1f443edfd8281a7144ae653e0))
+
 ## 0.1.0 (2026-10-19)
 
 

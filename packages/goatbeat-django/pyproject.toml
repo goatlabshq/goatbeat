@@ -1,6 +1,6 @@
 [project]
 name = "goatbeat-django"
-version = "0.1.0" # x-release-please-version
+version = "0.2.0" # x-release-please-version
 description = "Django 6.1 integration for Goatbeat: models, admin, management command and Django Tasks."
 readme = "README.md"
 license = "MIT"
@@ -20,8 +20,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "goatbeat-core==0.1.0", # x-release-please-version
-    "goatbeat-postgres==0.1.0", # x-release-please-version
+    "goatbeat-core==0.2.0", # x-release-please-version
+    "goatbeat-postgres==0.2.0", # x-release-please-version
     "django>=6.1",
 ]
 
