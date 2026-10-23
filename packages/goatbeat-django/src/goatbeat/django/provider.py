@@ -6,6 +6,7 @@ from django.db import DatabaseError, InterfaceError, OperationalError, connectio
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils.connection import ConnectionDoesNotExist
 from psycopg.conninfo import make_conninfo
+from psycopg.pq import Conninfo
 
 from goatbeat.core.errors import StoreUnavailableError
 from goatbeat.postgres.provider import UNAVAILABLE_ERRORS, Cursor
@@ -55,7 +56,12 @@ def notifier_conninfo(alias: str = "default") -> str:
         "port": settings.get("PORT"),
     }
     options: dict[str, object] = dict(settings.get("OPTIONS") or {})
-    libpq = {key: value for key, value in options.items() if isinstance(value, str | int)}
+    keywords = {option.keyword.decode() for option in Conninfo.get_defaults()}
+    libpq = {
+        key: value
+        for key, value in options.items()
+        if key in keywords and isinstance(value, str | int) and not isinstance(value, bool)
+    }
     merged = {**libpq, **{key: value for key, value in parameters.items() if value}}
     return make_conninfo(**{key: str(value) for key, value in merged.items()})
 

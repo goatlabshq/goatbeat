@@ -92,3 +92,18 @@ def test_the_listen_connection_keeps_the_database_options(monkeypatch: pytest.Mo
     conninfo = conninfo_to_dict(notifier_conninfo())
     assert conninfo["sslmode"] == "verify-full"
     assert conninfo["application_name"] == "x"
+
+
+def test_the_listen_connection_ignores_django_only_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = connection.settings_dict | {
+        "OPTIONS": {
+            "pool": True,
+            "server_side_binding": False,
+            "assume_role": "r",
+            "sslmode": "require",
+        }
+    }
+    monkeypatch.setitem(connections["default"].__dict__, "settings_dict", settings)
+    conninfo = conninfo_to_dict(notifier_conninfo())
+    assert conninfo["sslmode"] == "require"
+    assert {"pool", "server_side_binding", "assume_role"}.isdisjoint(conninfo)
