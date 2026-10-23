@@ -18,7 +18,62 @@
         "packages/goatbeat-rq/pyproject.toml",
         "packages/goatbeat-prometheus/pyproject.toml",
         "packages/goatbeat-otel/pyproject.toml",
-        "packages/goatbeat-cli/pyproject.toml"
+        "packages/goatbeat-cli/pyproject.toml",
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-core\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-postgres\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-django\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-celery\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-dramatiq\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-rq\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-prometheus\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-otel\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-cli\")].version"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name===\"goatbeat-workspace\")].version"
+        }
       ]
     }
   }

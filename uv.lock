@@ -485,7 +485,7 @@ wheels = [
 
 [[package]]
 name = "goatbeat"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat" }
 dependencies = [
     { name = "goatbeat-cli" },
@@ -531,7 +531,7 @@ provides-extras = ["postgres", "django", "celery", "dramatiq", "rq", "prometheus
 
 [[package]]
 name = "goatbeat-celery"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-celery" }
 dependencies = [
     { name = "celery" },
@@ -546,7 +546,7 @@ requires-dist = [
 
 [[package]]
 name = "goatbeat-cli"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-cli" }
 dependencies = [
     { name = "goatbeat-core" },
@@ -557,12 +557,12 @@ requires-dist = [{ name = "goatbeat-core", editable = "packages/goatbeat-core" }
 
 [[package]]
 name = "goatbeat-core"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-core" }
 
 [[package]]
 name = "goatbeat-django"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-django" }
 dependencies = [
     { name = "django" },
@@ -579,7 +579,7 @@ requires-dist = [
 
 [[package]]
 name = "goatbeat-dramatiq"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-dramatiq" }
 dependencies = [
     { name = "dramatiq" },
@@ -594,7 +594,7 @@ requires-dist = [
 
 [[package]]
 name = "goatbeat-otel"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-otel" }
 dependencies = [
     { name = "goatbeat-core" },
@@ -609,7 +609,7 @@ requires-dist = [
 
 [[package]]
 name = "goatbeat-postgres"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-postgres" }
 dependencies = [
     { name = "goatbeat-core" },
@@ -626,7 +626,7 @@ requires-dist = [
 
 [[package]]
 name = "goatbeat-prometheus"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-prometheus" }
 dependencies = [
     { name = "goatbeat-core" },
@@ -641,7 +641,7 @@ requires-dist = [
 
 [[package]]
 name = "goatbeat-rq"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/goatbeat-rq" }
 dependencies = [
     { name = "goatbeat-core" },
@@ -656,7 +656,7 @@ requires-dist = [
 
 [[package]]
 name = "goatbeat-workspace"
-version = "0.1.0"
+version = "0.2.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
