@@ -2,8 +2,10 @@ import json
 from io import StringIO
 
 import pytest
+from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import connection
+from django.test import override_settings
 from sampleapp import tasks
 
 from goatbeat.cli.main import main
@@ -60,6 +62,15 @@ def test_run_requests_an_extra_run_that_the_scheduler_dispatches() -> None:
     [execution] = store().recent_executions(None, limit=1)
     assert execution.status is ExecutionStatus.COMPLETED
     assert execution.idempotency_key.value.startswith("manual:")
+
+
+def test_a_single_tick_from_another_process_runs_right_after_the_first() -> None:
+    goatbeat("schedule", "list")
+    for process in ("first", "second"):
+        goatbeat("schedule", "run", "daily-report")
+        with override_settings(GOATBEAT={**settings.GOATBEAT, "scheduler_id": process}):
+            goatbeat("scheduler", "--once")
+    assert tasks.RUNS == ["report", "report"]
 
 
 def test_running_an_unknown_schedule_fails() -> None:

@@ -59,8 +59,11 @@ class Command(BaseCommand):
     def _scheduler(self, *, once: bool) -> None:
         with scheduler() as running:
             if once:
-                running.start()
-                running.tick()
+                try:
+                    running.start()
+                    running.tick()
+                finally:
+                    running.release()
                 return
             stop = threading.Event()
 
