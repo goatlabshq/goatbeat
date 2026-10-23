@@ -54,8 +54,9 @@ Celery task names are not Django tasks. A periodic task whose path is not a
 `django.tasks.Task` is imported **disabled**, with a note. Port the function to `@task` under
 the same import path (the admin refuses non-Django paths), then enable each schedule.
 
-To keep running the Celery tasks themselves, use `goatbeat-celery` with the standalone command
-instead of Django Tasks:
+To keep running the Celery tasks themselves, install `goatbeat-celery` and point the
+`submitter` key of the `GOATBEAT` setting at a `CelerySubmitter` (see the
+[Django integration](django.md#setup)). Without Django, pass it to the standalone command:
 
 ```python
 app = GoatbeatApp(registry=beat, submitter=CelerySubmitter(celery_app))

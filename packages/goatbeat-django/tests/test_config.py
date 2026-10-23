@@ -6,6 +6,7 @@ from django.db import connections
 from django.test import override_settings
 
 from goatbeat.django.conf import DjangoSettings
+from goatbeat.django.runtime import submitter
 
 
 def test_settings_are_parsed_into_typed_configuration() -> None:
@@ -23,6 +24,18 @@ def test_every_invalid_setting_is_reported_at_once() -> None:
     assert "lease_ttl" in message
     assert "batch_size" in message
     assert "unknown" in message
+
+
+@override_settings(GOATBEAT={"submitter": "sampleapp.submitters.missing"})
+def test_the_submitter_must_be_importable() -> None:
+    with pytest.raises(ImproperlyConfigured, match="submitter"):
+        DjangoSettings.from_django()
+
+
+@override_settings(GOATBEAT={"submitter": "sampleapp.submitters.not_a_submitter"})
+def test_the_submitter_must_submit() -> None:
+    with pytest.raises(ImproperlyConfigured, match="submitter"):
+        submitter()
 
 
 @override_settings(GOATBEAT=["not", "a", "mapping"])

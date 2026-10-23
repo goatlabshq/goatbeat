@@ -226,9 +226,10 @@ def _django_environment(stack: ExitStack) -> Environment:
         from django.core.exceptions import ImproperlyConfigured  # noqa: PLC0415
 
         from goatbeat.django import registry  # noqa: PLC0415
-        from goatbeat.django.conf import DjangoSettings  # noqa: PLC0415
+        from goatbeat.django.conf import DEFAULT_SUBMITTER, DjangoSettings  # noqa: PLC0415
         from goatbeat.django.provider import DjangoProvider, notifier_conninfo  # noqa: PLC0415
-        from goatbeat.django.submitter import DjangoTasksSubmitter, is_django_task  # noqa: PLC0415
+        from goatbeat.django.runtime import submitter  # noqa: PLC0415
+        from goatbeat.django.submitter import is_django_task  # noqa: PLC0415
         from goatbeat.postgres.notify import PsycopgNotifier  # noqa: PLC0415
         from goatbeat.postgres.store import PostgresStore  # noqa: PLC0415
     except ImportError as error:
@@ -248,9 +249,12 @@ def _django_environment(stack: ExitStack) -> Environment:
         store=store,
         leases=store,
         registry=registry(),
-        submitter=DjangoTasksSubmitter(),
+        submitter=submitter(settings),
         metrics=NoopMetrics(),
-        task_problem=lambda path: None if is_django_task(path) else f"{path}: not a Django task",
     )
+    if settings.submitter == DEFAULT_SUBMITTER:
+        environment.task_problem = lambda path: (
+            None if is_django_task(path) else f"{path}: not a Django task"
+        )
     environment.migrate = lambda: "Django projects migrate with: python manage.py migrate"
     return environment

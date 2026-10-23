@@ -5,6 +5,7 @@ from typing import Final, Self, cast
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
+from django.utils.module_loading import import_string
 
 from goatbeat.core.config import GoatbeatConfig
 from goatbeat.core.errors import ConfigurationError
@@ -13,6 +14,8 @@ SETTING: Final = "GOATBEAT"
 DATABASE_KEY: Final = "database"
 DEFAULT_DATABASE: Final = "default"
 TIMEZONE_KEY: Final = "timezone"
+SUBMITTER_KEY: Final = "submitter"
+DEFAULT_SUBMITTER: Final = "goatbeat.django.submitter.DjangoTasksSubmitter"
 POSTGRESQL: Final = "postgresql"
 
 
@@ -20,6 +23,7 @@ POSTGRESQL: Final = "postgresql"
 class DjangoSettings:
     config: GoatbeatConfig
     database: str = DEFAULT_DATABASE
+    submitter: str = DEFAULT_SUBMITTER
 
     @classmethod
     def from_django(cls) -> Self:
@@ -28,12 +32,15 @@ class DjangoSettings:
             raise ImproperlyConfigured(f"{SETTING} must be a dict, got {type(raw).__name__}")
         values = dict(cast("Mapping[str, object]", raw))
         database = values.pop(DATABASE_KEY, DEFAULT_DATABASE)
+        submitter = values.pop(SUBMITTER_KEY, DEFAULT_SUBMITTER)
         values.setdefault(TIMEZONE_KEY, settings.TIME_ZONE)
         errors: list[str] = []
         if not isinstance(database, str) or database not in connections.settings:
             errors.append(f"{DATABASE_KEY}: {database!r} is not a configured database alias")
         elif connections[database].vendor != POSTGRESQL:
             errors.append(f"{DATABASE_KEY}: {database!r} must be a PostgreSQL database")
+        if not isinstance(submitter, str) or not _importable(submitter):
+            errors.append(f"{SUBMITTER_KEY}: {submitter!r} is not an importable dotted path")
         try:
             config = GoatbeatConfig.from_mapping(values)
         except ConfigurationError as error:
@@ -41,4 +48,12 @@ class DjangoSettings:
             config = None
         if errors or config is None or not isinstance(database, str):
             raise ImproperlyConfigured(f"invalid {SETTING} setting: " + "; ".join(errors))
-        return cls(config=config, database=database)
+        return cls(config=config, database=database, submitter=str(submitter))
+
+
+def _importable(path: str) -> bool:
+    try:
+        import_string(path)
+    except ImportError:
+        return False
+    return True

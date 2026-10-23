@@ -17,7 +17,23 @@ GOATBEAT = {  # every key is optional
     "batch_size": 500,
     "max_submit_retries": 5,
     "scheduler_id": "web-1",  # defaults to host:pid:random
+    "submitter": "goatbeat.django.submitter.DjangoTasksSubmitter",
 }
+```
+
+`submitter` is the dotted path of a `TaskSubmitter` instance or of a callable returning one.
+To dispatch to Celery from `manage.py goatbeat scheduler`:
+
+```python
+# myproject/beat.py
+from goatbeat.celery import CelerySubmitter
+from myproject.celery import app
+
+submitter = CelerySubmitter(app)
+```
+
+```python
+GOATBEAT = {"submitter": "myproject.beat.submitter"}
 ```
 
 The setting is validated when Django starts. Any invalid value raises `ImproperlyConfigured`

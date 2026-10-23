@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import connection
 from django.test import override_settings
-from sampleapp import tasks
+from sampleapp import submitters, tasks
 
 from goatbeat.cli.main import main
 from goatbeat.core.execution import ExecutionStatus
@@ -71,6 +71,19 @@ def test_a_single_tick_from_another_process_runs_right_after_the_first() -> None
         with override_settings(GOATBEAT={**settings.GOATBEAT, "scheduler_id": process}):
             goatbeat("scheduler", "--once")
     assert tasks.RUNS == ["report", "report"]
+
+
+@pytest.mark.parametrize(
+    "path", ["sampleapp.submitters.RecordingSubmitter", "sampleapp.submitters.recording"]
+)
+def test_the_scheduler_uses_the_configured_submitter(path: str) -> None:
+    submitters.SUBMITTED.clear()
+    goatbeat("schedule", "list")
+    goatbeat("schedule", "run", "daily-report")
+    with override_settings(GOATBEAT={**settings.GOATBEAT, "submitter": path}):
+        goatbeat("scheduler", "--once")
+    assert submitters.SUBMITTED == ["sampleapp.tasks.send_report"]
+    assert tasks.RUNS == []
 
 
 def test_running_an_unknown_schedule_fails() -> None:
