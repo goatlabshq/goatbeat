@@ -1,6 +1,6 @@
 [project]
 name = "goatbeat"
-version = "0.1.0" # x-release-please-version
+version = "0.2.0" # x-release-please-version
 description = "A type-safe, distributed periodic task scheduler for Python and Django Tasks."
 readme = "README.md"
 license = "MIT"
@@ -18,18 +18,18 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "goatbeat-core==0.1.0", # x-release-please-version
-    "goatbeat-cli==0.1.0", # x-release-please-version
+    "goatbeat-core==0.2.0", # x-release-please-version
+    "goatbeat-cli==0.2.0", # x-release-please-version
 ]
 
 [project.optional-dependencies]
-postgres = ["goatbeat-postgres==0.1.0"] # x-release-please-version
-django = ["goatbeat-django==0.1.0"] # x-release-please-version
-celery = ["goatbeat-celery==0.1.0"] # x-release-please-version
-dramatiq = ["goatbeat-dramatiq==0.1.0"] # x-release-please-version
-rq = ["goatbeat-rq==0.1.0"] # x-release-please-version
-prometheus = ["goatbeat-prometheus==0.1.0"] # x-release-please-version
-otel = ["goatbeat-otel==0.1.0"] # x-release-please-version
+postgres = ["goatbeat-postgres==0.2.0"] # x-release-please-version
+django = ["goatbeat-django==0.2.0"] # x-release-please-version
+celery = ["goatbeat-celery==0.2.0"] # x-release-please-version
+dramatiq = ["goatbeat-dramatiq==0.2.0"] # x-release-please-version
+rq = ["goatbeat-rq==0.2.0"] # x-release-please-version
+prometheus = ["goatbeat-prometheus==0.2.0"] # x-release-please-version
+otel = ["goatbeat-otel==0.2.0"] # x-release-please-version
 
 [project.urls]
 Homepage = "https://github.com/goatlabshq/goatbeat"
